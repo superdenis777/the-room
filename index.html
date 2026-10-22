@@ -860,8 +860,109 @@ function guestColor(g, J, s, h, lx, ly) {
   return L.skin;
 }
 
+// ---------------------------------------------------------------- the guests, drawn by hand
+// Seated, they are pixel art placed by hand rather than shapes: PC-98 / old Hollywood. Each row is
+// [row, column, pixels], painted in order, so later rows (an arm) lie over earlier ones (the chest).
+// Columns run from 8 px behind the hip; row 66 is the floor. Both face right; hers is mirrored.
+const SEATED = {
+  him: {
+    pal: {
+      o: [24, 18, 22], Y: [250, 222, 150], y: [222, 178, 98], h: [162, 112, 52], H: [104, 66, 32],
+      S: [236, 188, 148], s: [206, 148, 110], d: [150, 96, 72], e: [26, 18, 22], b: [96, 62, 32], m: [172, 96, 86],
+      W: [246, 244, 238], w: [190, 192, 204], T: [14, 12, 18], K: [96, 100, 124], J: [54, 56, 72], j: [32, 32, 44], L: [20, 20, 28],
+      N: [48, 50, 64], n: [28, 28, 38], k: [84, 88, 108], B: [18, 16, 20], g: [150, 146, 156]
+    },
+    eye: [18, 8], skin: "S",
+    rows: [
+      [0, 14, "oooo"], [1, 11, "oooyYYyo"], [2, 9, "oohyyYYyyo"], [3, 8, "ohhhyyyYyyo"], [4, 7, "oHhhhyyyhyyho"],
+      [5, 7, "oHHhhhhhyhhSSo"], [6, 7, "oHHHhhhhhSSSSo"], [7, 7, "oHHHhhdSSSSbbSo"], [8, 7, "oHHhdssSSSSeSSo"],
+      [9, 7, "oHHsdSdsSSSSSSSo"], [10, 7, "oHhsdddsSSSSSSSSo"], [11, 8, "oHssssSSSSSSsddo"], [12, 9, "odssSSSSSSSmmo"],
+      [13, 10, "odssSSSSSSSo"], [14, 11, "oddssSSSSso"], [15, 12, "odsssooooo"], [16, 11, "oddssdo"],
+      [17, 7, "ojJJKKJWWsWo"], [18, 6, "ojJJKKKJLWTWo"], [19, 5, "ojJJJKKKJLWTWo"], [20, 5, "ojJJJJKKJJLTWo"],
+      [21, 5, "ojjJJJJKJJJLTo"], [22, 4, "ojjJJJJJJWJJLTo"], [23, 4, "ojjJJJJJJJJJJLo"], [24, 4, "ojjjJJJJJJJJJJo"],
+      [25, 4, "ojjjJJJJJJJJJJo"], [26, 4, "ojjjJJJJJJJJJo"], [27, 4, "ojjjJJJJJJJJJo"], [28, 4, "ojjjJJJJJJJJo"],
+      [29, 4, "ojjjJJJJJJJJo"], [30, 4, "ojjjJJJJJJJJo"], [31, 4, "ojjjJJJJJJJJo"], [32, 4, "ojjjJJJJJJJJo"],
+      [33, 4, "ojjjJJJJJJJJJo"], [34, 4, "ojjjJJJJJJJJJo"], [35, 4, "ojjjjJJJJJJJJJo"], [36, 4, "ojjjjJJJJJJJJJo"],
+      [37, 4, "ojjjjjJJJJJJJJo"],
+      // the far leg, behind
+      ...[45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61].map(r => [r, 23, "onn"]),
+      [63, 21, "oBBB"], [64, 21, "oBBB"], [65, 21, "oBBB"],
+      // thighs, knees, shins, oxfords
+      [38, 4, "ojjjjjjjJJJJjoooooooooooooooo"], [39, 4, "ojjjjjjjjjjjNkkkkkkkkkkkkkkNo"],
+      [40, 4, "onnnnNNNNNNNNNNNNNNNNNNNNNNNNo"], [41, 4, "onnnNNNNNNNNNNNNNNNNNNNNNNNNNo"],
+      [42, 5, "onnnnnnNNNNNNNNNNNNNNNNNNNNo"], [43, 6, "onnnnnnnnnnnnnnnnnnnnNNNNo"], [44, 7, "ooooooooooooooooooonNNNo"],
+      [45, 25, "onNNNko"], [46, 25, "onNNNko"], ...[47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59].map(r => [r, 25, "onNNNNko"]),
+      [60, 25, "onnNNNNko"], [61, 25, "onnNNNNNko"],
+      [62, 25, "oBBBBBBBoo"], [63, 24, "oBBBBBBBBBgBoo"], [64, 24, "oBBBBBBBBBBBBBo"], [65, 24, "oBBBBBBBBBBBBBBo"], [66, 25, "oooooooooooooo"],
+      // the near arm: sleeve, shirt cuff, a hand on the cup's handle
+      [18, 9, "oKKJJo"], [19, 9, "oKKKJJjo"], [20, 10, "oKKJJJjo"], [21, 11, "oKKJJJjo"], [22, 12, "oKKJJJjo"],
+      [23, 13, "oKKJJJjo"], [24, 14, "oKKJJJjo"], [25, 15, "oKKJJJjoooooooooooSSo"], [26, 16, "oKJJJKKKKKKKKKKWWSSSo"],
+      [27, 17, "oJJJJJJJJJJJJJWWsSSo"], [28, 18, "ojjjjjjjjjjjjwwsso"]
+    ]
+  },
+  her: {
+    pal: {
+      o: [22, 14, 24], H: [16, 12, 20], h: [44, 36, 54], y: [110, 100, 132], Y: [170, 160, 196],
+      S: [240, 196, 164], s: [214, 160, 128], d: [160, 104, 84], e: [20, 14, 20], l: [12, 10, 14], m: [196, 30, 52], M: [140, 16, 36],
+      R: [214, 32, 52], r: [150, 16, 34], G: [70, 120, 60], P: [244, 240, 230],
+      D: [30, 22, 36], x: [16, 12, 20], X: [150, 128, 168], Z: [80, 66, 96], V: [22, 18, 26], v: [120, 106, 138], F: [196, 26, 44], f: [120, 10, 26]
+    },
+    eye: [18, 10], skin: "S",
+    rows: [
+      // glossy waves, a red rose behind her ear, cat-eye glasses, red lips, a pearl
+      [3, 10, "ooooo"], [4, 8, "oohhyyhoo"], [5, 7, "ohHhyYYyhho"], [6, 6, "oHHhhyYyhhhho"], [7, 6, "oHHHhhhyhhhhHo"],
+      [8, 5, "oHRRHHhhhhhHHSlo"], [9, 5, "orRRHHHdSSSSllllo"], [10, 5, "oHGHHHHdsSSSSelSSo"], [11, 5, "oHHHHHHPdsSSSllSSSo"],
+      [12, 5, "oHHHHHHHdsSSSSSSSSdo"], [13, 6, "oHHHHHHdsSSSSSSmMo"], [14, 6, "oHHHHHHHdsSSSSSSo"], [15, 6, "oHHHHHHHHddssSo"],
+      [16, 6, "oHHyHHHHHHsso"], [17, 6, "oHHyHHHHHHssSo"],
+      // bare shoulders, a strapless satin bodice, a small waist
+      [18, 5, "oHHHyHHHHsSSSSo"], [19, 5, "oHHHHyHHsSSSSSSo"], [20, 5, "ohHHHHHsSSSSSSSSo"], [21, 5, "ohhHHHdsSSSSSSSSo"],
+      [22, 6, "ohhHxDDDDXXDDDZo"], [23, 6, "ohxDDDDDXXXDDDZo"], [24, 6, "oxDDDDDDDXXDDZo"], [25, 6, "oxDDDDDDDDDDZo"],
+      [26, 6, "oxDDDDDDDDDZo"], [27, 6, "oxDDDDDDDDZo"], [28, 6, "oxDDDDDDDDZo"], [29, 5, "oxxDDDDDDDDZo"],
+      [30, 5, "oxxDDDDDDDDDZo"], [31, 4, "oxxDDXDDDDDDDZo"], [32, 4, "oxxDDXXDDDDDDDZo"],
+      [33, 3, "oxxxDDXXDDDDDDDZo"], [34, 3, "oxxxDDDXDDDDDDDZo"], [35, 3, "oxxxDDDDDDDDDDDZo"], [36, 3, "oxxxDDDDDDDDDDDZo"], [37, 3, "oxxxDDDDDDDDDDDZo"],
+      // the pencil dress over her thighs, past the knee, with a slit
+      [38, 3, "oxxxDDDDDDDDDDDZooooooooooooo"], [39, 3, "oxxxDDDDDDDDDDDXXXXXXXXXXXXXZo"], [40, 3, "oxxDDDDDDDDDDDDDDDDDDDDDDDDDZo"],
+      [41, 4, "oxxxDDDDDDDDDDDDDDDDDDDDDDZo"], [42, 5, "oxxxxxxxxxxxxxxxxxDDDDDDZo"], [43, 7, "oooooooooooooooxDDDDDZo"],
+      [44, 22, "oxDDDDZo"], [45, 22, "oxDDDDZo"], [46, 22, "oxDDDdSo"], [47, 22, "oxDDDdSo"], [48, 22, "oxDDdSSo"], [49, 22, "oxDDdSSo"],
+      [50, 22, "oxDXXdSo"], [51, 22, "ooooosSo"],
+      // slender legs, red stilettos with an ankle strap
+      [52, 23, "osSSSo"], [53, 23, "osSSSo"], [54, 23, "osSSSo"], [55, 24, "osSSo"], [56, 24, "osSSo"], [57, 24, "osSSo"],
+      [58, 24, "osSSo"], [59, 24, "osSSo"], [60, 24, "ofFFo"], [61, 23, "oFFFFFo"], [62, 23, "ofFFFFFFo"],
+      [63, 23, "ofo.oFFFFo"], [64, 23, "ofo..oFFFFo"], [65, 23, "ofo...ooooo"], [66, 23, "ooo"],
+      // the near arm: bare to above the elbow, then a black satin opera glove, her hand at her glass
+      [19, 12, "oSSso"], [20, 13, "oSSso"], [21, 14, "oSSso"], [22, 15, "oSSso"], [23, 16, "osVVo"], [24, 17, "oVvVVo"],
+      [25, 18, "oVvVVooooooooooooo"], [26, 19, "oVVvvvvvvvvvvvvvvVVo"], [27, 20, "oVVVVVVVVVVVVVVVVVo"], [28, 21, "ooooooooooooooooo"]
+    ]
+  }
+};
+for (const sp of Object.values(SEATED)) { // flatten to pixels: local x from the hip, y up from the floor
+  sp.px = [];
+  for (const [r, c, str] of sp.rows) for (let i = 0; i < str.length; i++) if (str[i] !== ".") sp.px.push([c + i - 8, r - 66, sp.pal[str[i]]]);
+}
+function drawSeated(d, g, t) {
+  const sp = SEATED[g.side ? "her" : "him"], f = g.dir, up = g.lookUp ? 1 : 0;
+  let x0 = W, x1 = 0;
+  for (const [lx, ly, c] of sp.px) {
+    const x = Math.round(g.x) + lx * f, y = FEET + ly + (ly < -22 ? Math.round(Math.sin(t * 1.7 + g.side * 2) * 0.4) : 0); // breathing
+    if (x < 0 || x >= W || y < 0 || y >= H) continue;
+    const j = y * W + x;
+    for (let k = 0; k < 3; k++) d[j * 4 + k] = q(c[k] * Math.min(1.25, light[j * 3 + k] * 1.15), x, y);
+    guestMask[j] = g.side + 1; x0 = Math.min(x0, x); x1 = Math.max(x1, x);
+  }
+  // blinking, and glancing up when the cat is above
+  const [ec, er] = sp.eye, ex = Math.round(g.x) + (ec - 8) * f, ey = FEET + er - 66;
+  const blink = (t + g.side * 1.7) % (g.side ? 4.3 : 5.1) < 0.14;
+  if (blink || up) {
+    const j = ey * W + ex, sk = sp.pal[sp.skin];
+    for (let k = 0; k < 3; k++) d[j * 4 + k] = q((blink ? sk[k] * 0.8 : sk[k]) * light[j * 3 + k], ex, ey);
+    if (up && !blink) { const j2 = (ey - 1) * W + ex; for (let k = 0; k < 3; k++) d[j2 * 4 + k] = q(sp.pal.e[k] * light[j2 * 3 + k], ex, ey - 1); }
+  }
+  rimLight(d, guestMask, g.side + 1, x0, x1, FEET - 68, FEET + 1);
+}
+
 const guestMask = new Uint8Array(W * H);
 function drawGuest(d, g, t) {
+  if (g.sit > 0.6) return drawSeated(d, g, t);
   const J = guestJoints(g, t), list = guestShapes(g, J), f = g.facing, gx = Math.round(g.x);
   const x0 = Math.max(1, gx + Math.min(-14 * f, 32 * f)), x1 = Math.min(W - 2, gx + Math.max(-14 * f, 32 * f));
   const y0 = Math.max(1, FEET - 92), y1 = Math.min(H - 2, FEET + 1);
