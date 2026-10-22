@@ -9,13 +9,35 @@
 <meta property="og:description" content="A café in a hotel run by cats. Two windows, two real skies.">
 <meta property="og:image" content="https://superdenis777.github.io/the-room/preview.png">
 <meta property="og:type" content="website">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Limelight&family=Cormorant+Garamond:ital,wght@1,500&display=swap" rel="stylesheet">
 <style>
   :root { --ink: #e8e4d8; --dim: #8f8a7c; --bg: #07080f; }
   html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink);
     font: 13px/1.4 ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace; }
   body { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 16px; box-sizing: border-box; }
-  h1 { margin: 0; font: inherit; font-size: 11px; font-weight: 400; letter-spacing: .5em; text-transform: uppercase; color: var(--dim); }
-  .frame { width: min(100%, 1024px); aspect-ratio: 16 / 9; position: relative; overflow: hidden; }
+  :root { --gold: #c9a35a; --gold-dim: #6e5628; }
+  header { text-align: center; line-height: 1.1; }
+  h1 { margin: 0; font: 400 clamp(26px, 5vw, 40px) "Limelight", Georgia, serif; letter-spacing: .14em; color: var(--gold);
+    text-shadow: 0 0 18px rgba(201, 163, 90, .25); }
+  header p { margin: 4px 0 0; font: italic 500 15px "Cormorant Garamond", Georgia, serif; color: #a39470; letter-spacing: .04em; }
+  header p::before, header p::after { content: "◆"; font-size: 8px; vertical-align: 3px; margin: 0 10px; color: var(--gold-dim); }
+  /* An Art Deco frame: gold double rule, with stepped fans in the corners. */
+  .deco { width: min(100%, 1024px); position: relative; padding: 7px; box-sizing: border-box;
+    border: 2px solid var(--gold); box-shadow: inset 0 0 0 3px var(--bg), inset 0 0 0 4px var(--gold-dim); }
+  .deco i { position: absolute; width: 26px; height: 26px; pointer-events: none;
+    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 26 26'%3E%3Cg fill='none' stroke='%23c9a35a' stroke-width='1.3'%3E%3Cpath d='M2 16A14 14 0 0 1 16 2'/%3E%3Cpath d='M2 10A8 8 0 0 1 10 2'/%3E%3Cpath d='M2 2L11 11'/%3E%3Cpath d='M2 22L6 18M22 2L18 6'/%3E%3C/g%3E%3C/svg%3E") no-repeat; }
+  .deco .tl { top: -2px; left: -2px; } .deco .tr { top: -2px; right: -2px; transform: scaleX(-1); }
+  .deco .bl { bottom: -2px; left: -2px; transform: scaleY(-1); } .deco .br { bottom: -2px; right: -2px; transform: scale(-1, -1); }
+  .frame { width: 100%; aspect-ratio: 16 / 9; position: relative; overflow: hidden; cursor: pointer; }
+  /* The narrator's card, like an old film's intertitle. */
+  #say { position: absolute; left: 50%; bottom: 5%; transform: translate(-50%, 6px); width: min(86%, 560px); box-sizing: border-box;
+    padding: 12px 18px; text-align: center; font: italic 500 clamp(15px, 2.3vw, 19px)/1.35 "Cormorant Garamond", Georgia, serif;
+    color: #efe6cf; background: rgba(9, 7, 12, .9); border: 1px solid var(--gold); outline: 1px solid var(--gold-dim); outline-offset: 3px;
+    opacity: 0; pointer-events: none; transition: opacity .5s, transform .5s; }
+  #say.on { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
+  .hint { color: #5d5644; font: italic 500 14px "Cormorant Garamond", Georgia, serif; }
   .frame canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; image-rendering: pixelated; image-rendering: crisp-edges; display: block; }
   /* On a phone held upright, frame only the window, the table and the seam (columns 48 to 207). */
   @media (orientation: portrait) and (max-width: 700px) {
@@ -28,13 +50,15 @@
   .right { text-align: right; }
   #state { color: #f2c27b; text-align: center; min-height: 1.4em; }
   .ctl { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
-  button { font: inherit; color: var(--ink); background: #151826; border: 1px solid #2a2f45; padding: 6px 12px; cursor: pointer; }
-  button[aria-pressed="true"] { border-color: #f2c27b; color: #f2c27b; }
+  button { font: inherit; color: var(--ink); background: #12121a; border: 1px solid var(--gold-dim); padding: 6px 14px; cursor: pointer; letter-spacing: .04em; }
+  button[aria-pressed="true"] { border-color: var(--gold); color: var(--gold); }
 </style>
 </head>
 <body>
-<h1>Hotel Dada</h1>
-<div class="frame"><canvas id="c" width="256" height="144"></canvas></div>
+<header><h1>HOTEL DADA</h1><p>established in two time zones</p></header>
+<div class="deco"><i class="tl"></i><i class="tr"></i><i class="bl"></i><i class="br"></i>
+  <div class="frame"><canvas id="c" width="256" height="144"></canvas><div id="say" role="status" aria-live="polite"></div></div>
+</div>
 <div class="row">
   <div class="side"><b id="tA">--:--</b><br><span id="nA"></span></div>
   <div id="state"></div>
@@ -45,6 +69,7 @@
   <button id="fast" aria-pressed="false">one day per minute</button>
   <button id="music" aria-pressed="false">♪ music</button>
 </div>
+<div class="hint">tap anything</div>
 <script>
 // The room: one fixed frame, a cross-section of the hotel café. A high window on the back wall
 // holds both real skies, split by the seam; their light mixes inside and meets on the table.
@@ -823,7 +848,7 @@ function guestShapes(g, J) {
 const mixC = (a, b, w) => a.map((v, i) => lerp(v, b[i], w));
 function guestColor(g, J, s, h, lx, ly) {
   const L = g.look;
-  if (!(g.side && (s.part === "shoe" || s.part === "heel"))) return SIL; // noir: only her red heels keep their colour
+  if (!(g.side && (s.part === "shoe" || s.part === "heel"))) return SEATED[g.side ? "her" : "him"].sil; // noir: only her red heels keep their colour
   const sheen = (base, hi) => mixC(base, hi, clamp01((h.nz - 0.55) * 2.4) * clamp01(0.4 - h.ny)); // satin catches the light
   const cloth = () => mixC(L.suit, L.suitHi, h.nz > 0.82 ? 0.3 : 0.1 * grain(Math.floor(lx), Math.floor(ly)));
   switch (s.part) {
@@ -916,11 +941,13 @@ const SEATED = {
 };
 // Noir: the guests are silhouettes. Only their accents keep colour; the room's light finds their edges.
 const SIL = [22, 18, 28];
+SEATED.him.sil = [16, 20, 44]; // midnight blue
+SEATED.her.sil = [42, 14, 30]; // deep wine
 for (const sp of Object.values(SEATED)) { // flatten to pixels: local x from the hip, y up from the floor
   sp.px = [];
   for (const [r, c, str] of sp.rows) for (let i = 0; i < str.length; i++) {
     const ch = str[i];
-    if (ch !== ".") sp.px.push([c + i - 8, r - 66, sp.pal.accents.includes(ch) ? sp.pal[ch] : SIL, ch === "g"]);
+    if (ch !== ".") sp.px.push([c + i - 8, r - 66, sp.pal.accents.includes(ch) ? sp.pal[ch] : sp.sil, ch === "g"]);
   }
 }
 function drawSeated(d, g, t) {
@@ -1132,6 +1159,103 @@ function drawAir(d, now) {
   for (let j = 0, i = 0; j < W * H; j++, i += 4) { d[i] *= VIG[j]; d[i + 1] *= VIG[j]; d[i + 2] *= VIG[j]; } // a soft vignette
 }
 
+// ---------------------------------------------------------------- the narrator
+// Tap anything and the hotel says one dry line about it, on a card like an old film's intertitle.
+// Every line is written by hand; nothing is generated, stored or sent.
+let lastCat = null, lastSuns = null;
+const you = side => ME === side;
+const NARRATION = {
+  cat: () => lastCat && lastCat.asleep
+    ? ["The cat is asleep, or doing an excellent impression of it.", "It sleeps exactly on the seam, so as not to take sides.", "Do not wake the cat. The cat will know it was you."]
+    : ["The cat is pretending not to have noticed you. It is very good at this.", "The cat works here. Nobody has ever established what the job is.",
+       "It has a name. You have not been told it. You may not be ready.", "It belongs to neither side of the room, and considers both its own.",
+       "The cat gives you a long, slow blink. In cat, that is a love letter."],
+  bed: ["A small round bed, set exactly on the seam. The cat insisted.", "Half of the bed is in one time zone. The cat sleeps in both."],
+  sill: ["The sill. Reserved for the cat, by the cat.", "From up here you can see two skies. The cat finds this unremarkable."],
+  clock: ["One minute hand, two hour hands. The clock has made its peace with this.", "The red hand keeps her time, the dark one his. The minutes they share.",
+          "It is eleven hours fast, or eleven hours slow. It refuses to say which."],
+  lamp: ["The lamp comes on when anyone, anywhere, is in the dark.", "A modest lamp. It is doing most of the work tonight."],
+  roses: ["Three red roses. Nobody admits to ordering them.", "They are real enough. Do not ask how."],
+  coffee: ["Black coffee. It has been exactly this temperature for some time.", "The steam is the only thing in the room in a hurry."],
+  martini: ["A very dry martini with one olive. The olive is waiting for its moment.", "She has hardly touched it. She doesn't need to."],
+  speaker: ["A tiny speaker in the shape of a cat's head. It plays whatever the hotel is in the mood for.", "The music comes from somewhere much further away than the speaker."],
+  pothos: ["A pothos, trailing down the brick at roughly the speed of a year."],
+  palm: ["A potted palm. Every grand hotel has one. This one is grander than it looks.", "It has seen everything that ever happened in this room, and is telling no one."],
+  stairs: ["The stairs lead up to the rest of the hotel. The rest of the hotel is not open to guests. Yet.", "Someone goes up and down these at night. It isn't you."],
+  seam: ["The seam. On one side it is one time, on the other another. The wall does not mind.", "You could put your hand on it. It would feel like a wall. It isn't, quite."],
+  bulbs: ["Little bulbs along the arch, lit for whoever is still up."],
+  bar: ["The bar. Closed, officially. The cat has a key."],
+  table: ["A small table for two. It was made for exactly this.", "Somewhere under it, two pairs of feet are not quite touching."],
+  wall: ["Brick. Old, warm and unhurried.", "The wall has heard every conversation in this room and repeated none of them."],
+  floor: ["The floorboards remember every footstep, and are discreet about it."],
+  chair0: ["An empty chair, on the left. It is not empty the way empty chairs usually are.", "Someone sits here. Not right now."],
+  chair1: ["An empty chair, on the right. It is keeping a place.", "Someone sits here. Not right now. Soon, the chair suspects."],
+  guest0: () => you(0)
+    ? ["You. You look better in the dark than you have any right to.", "You, in your good suit. You may as well have dressed for it."]
+    : ["Him. A silhouette with excellent posture and unreasonable hair.", "He is looking at you. Of course he is."],
+  guest1: () => you(1)
+    ? ["You. The room is noticeably better for it.", "You, in the black dress. The cat approves, which almost never happens."]
+    : ["Her. The room rearranged itself slightly when she sat down.", "A red rose, a glint of glasses, and nothing else you are allowed to see. Yet."],
+  sky0: () => skyLines(0), sky1: () => skyLines(1)
+};
+function skyLines(side) {
+  const P = PLACES[side], alt = lastSuns ? lastSuns[side].alt : 0;
+  if (alt > 6) return [`${P.label}, in daylight. The day is going on without you.`, `The sky over ${P.label}. Real, and exactly as it is right now.`];
+  if (alt > -6) return [`${P.label} is changing its mind about the light.`, `Twilight in ${P.label}. The hotel's favourite hour.`];
+  return [`${P.label}, after dark. Somewhere out there is a bed you are not in.`, `Night over ${P.label}. The stars here are the ones really there.`];
+}
+const told = {};
+function lineFor(key) {
+  const ls = typeof NARRATION[key] === "function" ? NARRATION[key]() : NARRATION[key];
+  told[key] = ((told[key] ?? -1) + 1) % ls.length;
+  return ls[told[key]];
+}
+function whatAt(x, y) {
+  const near = (m, v) => {
+    for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
+      const k = (y + dy) * W + x + dx;
+      if (k >= 0 && k < W * H && (v ? m[k] === v : m[k])) return true;
+    }
+    return false;
+  };
+  if (x >= 103 && x <= 111 && y >= 88 && y <= 97) return "coffee"; // small things first: hands rest beside them
+  if (x >= 142 && x <= 152 && y >= 84 && y <= 97) return "martini";
+  if (x >= 112 && x <= 120 && y >= 78 && y <= 97) return "roses";
+  if (near(catMask)) return "cat";
+  if (near(guestMask, 1)) return "guest0";
+  if (near(guestMask, 2)) return "guest1";
+  if (Math.hypot(x - CLOCK[0], y - CLOCK[1]) <= 5.5) return "clock";
+  if (x >= 120 && x <= 136 && y >= 79 && y <= 97) return "lamp";
+  if (x >= SPK - 1 && x <= SPK + 10 && y >= 77 && y <= 90) return "speaker";
+  if (x >= 114 && x <= 142 && y >= 54 && y <= 62) return "bed";
+  if (x >= 198 && x <= 212 && y >= 56 && y <= 84) return "pothos";
+  if (BULBS.some(([bx, by]) => Math.abs(bx - x) <= 2 && Math.abs(by - y) <= 2)) return "bulbs";
+  if (kind[y * W + x] === GLASS) return x < SEAM ? "sky0" : "sky1";
+  if (Math.abs(x - SEAM) <= 1 && y < WALL_BASE) return "seam";
+  if (y >= SILL_Y && y <= SILL_Y + 6 && x >= 40 && x <= 216) return "sill";
+  if (x >= 38 && x <= 67 && y >= 76) return "palm";
+  if (x <= 46 && y >= 60) return "stairs";
+  if (x >= 66 && x <= 92 && y >= 86) return "chair0";
+  if (x >= 163 && x <= 189 && y >= 86) return "chair1";
+  if (x >= 92 && x <= 164 && y >= 97) return "table";
+  if (x >= 194 && y >= 88 && y < 122) return "bar";
+  return y >= WALL_BASE ? "floor" : "wall";
+}
+const sayEl = document.getElementById("say");
+let sayTimer = 0;
+function narrate(text) {
+  sayEl.textContent = text;
+  sayEl.classList.add("on");
+  clearTimeout(sayTimer);
+  sayTimer = setTimeout(() => sayEl.classList.remove("on"), 4500 + text.length * 35);
+}
+document.getElementById("c").addEventListener("click", e => {
+  const r = e.currentTarget.getBoundingClientRect();
+  const x = Math.floor((e.clientX - r.left) / r.width * W), y = Math.floor((e.clientY - r.top) / r.height * H);
+  if (x >= 0 && x < W && y >= 0 && y < H) narrate(lineFor(whatAt(x, y)));
+});
+sayEl.addEventListener("click", e => { e.stopPropagation(); sayEl.classList.remove("on"); });
+
 // ---------------------------------------------------------------- each frame
 let fast = false, simTime = Date.now(), last = performance.now(), lampLevel = 0;
 const fmt = (d, tz) => d.toLocaleTimeString("en-GB", { timeZone: tz, hour: "2-digit", minute: "2-digit" });
@@ -1201,7 +1325,8 @@ function frame(now) {
   }
 
   // The cat keeps real time even when the skies run fast, so it stays a cat and not a blur.
-  const cat = catShown(Date.now() / 1000, now / 1000);
+  const cat = lastCat = catShown(Date.now() / 1000, now / 1000);
+  lastSuns = suns;
   shadow(d, cat.x, SILL_Y + 0.5, 9, 1.3, 0.35);
   drawCat(d, cat);
   if (cat.asleep) for (let n = 0; n < 3; n++) { // little z's drifting up from the bed
