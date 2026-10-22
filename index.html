@@ -1,0 +1,708 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hotel Dada</title>
+<meta name="description" content="A café in a hotel run by cats. Two windows, two real skies.">
+<meta property="og:title" content="Hotel Dada">
+<meta property="og:description" content="A café in a hotel run by cats. Two windows, two real skies.">
+<meta property="og:image" content="https://superdenis777.github.io/the-room/preview.png">
+<meta property="og:type" content="website">
+<style>
+  :root { --ink: #e8e4d8; --dim: #8f8a7c; --bg: #07080f; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink);
+    font: 13px/1.4 ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace; }
+  body { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 16px; box-sizing: border-box; }
+  h1 { margin: 0; font: inherit; font-size: 11px; font-weight: 400; letter-spacing: .5em; text-transform: uppercase; color: var(--dim); }
+  .frame { width: min(100%, 1024px); aspect-ratio: 16 / 9; position: relative; overflow: hidden; }
+  .frame canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; image-rendering: pixelated; image-rendering: crisp-edges; display: block; }
+  /* On a phone held upright, frame only the window, the table and the seam (columns 48 to 207). */
+  @media (orientation: portrait) and (max-width: 700px) {
+    .frame { aspect-ratio: 160 / 144; }
+    .frame canvas { width: 160%; left: -30%; }
+  }
+  .row { width: min(100%, 1024px); display: grid; grid-template-columns: 1fr auto 1fr; align-items: baseline; gap: 8px; }
+  .side b { font-size: 22px; font-weight: 600; letter-spacing: .04em; }
+  .side span { color: var(--dim); }
+  .right { text-align: right; }
+  #state { color: #f2c27b; text-align: center; min-height: 1.4em; }
+  .ctl { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+  button { font: inherit; color: var(--ink); background: #151826; border: 1px solid #2a2f45; padding: 6px 12px; cursor: pointer; }
+  button[aria-pressed="true"] { border-color: #f2c27b; color: #f2c27b; }
+</style>
+</head>
+<body>
+<h1>Hotel Dada</h1>
+<div class="frame"><canvas id="c" width="256" height="144"></canvas></div>
+<div class="row">
+  <div class="side"><b id="tA">--:--</b><br><span id="nA"></span></div>
+  <div id="state"></div>
+  <div class="side right"><b id="tB">--:--</b><br><span id="nB"></span></div>
+</div>
+<div class="ctl">
+  <button id="now" aria-pressed="true">now</button>
+  <button id="fast" aria-pressed="false">one day per minute</button>
+  <button id="music" aria-pressed="false">♪ music</button>
+</div>
+<script>
+// The room: one fixed frame, a cross-section of the hotel café. A high window on the back wall
+// holds both real skies, split by the seam; their light mixes inside and meets on the table.
+// Everything is computed from the two clocks and a seed. Nothing is stored.
+//
+// The two places come from the link, after the # (a fragment never reaches any server):
+//   #a=Label,lat,lon,Area/City,mark&b=Label,lat,lon,Area/City,mark    mark: tower, tree or hills
+// Without one, the room shows two stand-in cities. No real guest's place is written in this file.
+const DEMO = { a: "Kyoto,35.01,135.77,Asia/Tokyo,hills", b: "Lisbon,38.72,-9.14,Europe/Lisbon,tree" };
+function place(spec, fallback) {
+  const [label, lat, lon, tz, mark] = (spec || "").split(","), la = +lat, lo = +lon;
+  let ok = label && Math.abs(la) <= 90 && Math.abs(lo) <= 180 && lat !== "" && lon !== "";
+  try { new Intl.DateTimeFormat("en", { timeZone: tz }); } catch { ok = false; }
+  if (!ok) return place(fallback);
+  return { label: label.slice(0, 40), lat: la, lon: lo, tz, mark: ["tower", "tree"].includes(mark) ? mark : "hills" };
+}
+const LINK = new URLSearchParams(location.hash.slice(1));
+const PLACES = [place(LINK.get("a"), DEMO.a), place(LINK.get("b"), DEMO.b)]; // left, right
+const W = 256, H = 144, SEAM = 128;
+const WIN = { x0: 48, x1: 207, y0: 8, y1: 55, arch: 14 }; // the glass, with an arched top
+const HW = 80, HZ = 40;                  // half-window width; horizon row inside the window
+const SILL_Y = 62, FLOOR_Y = 121, WALL_BASE = 112;
+const ctx = document.getElementById("c").getContext("2d");
+const img = ctx.createImageData(W, H);
+const rad = Math.PI / 180;
+
+// NOAA solar position: altitude and hour angle (degrees) for a place at an instant.
+function sun(date, lat, lon) {
+  const start = Date.UTC(date.getUTCFullYear(), 0, 1);
+  const hours = date.getUTCHours() + date.getUTCMinutes() / 60 + date.getUTCSeconds() / 3600;
+  const g = 2 * Math.PI / 365 * (Math.floor((date - start) / 864e5) + (hours - 12) / 24);
+  const eqTime = 229.18 * (0.000075 + 0.001868 * Math.cos(g) - 0.032077 * Math.sin(g)
+    - 0.014615 * Math.cos(2 * g) - 0.040849 * Math.sin(2 * g));
+  const decl = 0.006918 - 0.399912 * Math.cos(g) + 0.070257 * Math.sin(g) - 0.006758 * Math.cos(2 * g)
+    + 0.000907 * Math.sin(2 * g) - 0.002697 * Math.cos(3 * g) + 0.00148 * Math.sin(3 * g);
+  const solarMin = hours * 60 + eqTime + 4 * lon;
+  const ha = solarMin / 4 - 180;
+  const cosZ = Math.sin(lat * rad) * Math.sin(decl) + Math.cos(lat * rad) * Math.cos(decl) * Math.cos(ha * rad);
+  return { alt: 90 - Math.acos(Math.max(-1, Math.min(1, cosZ))) / rad, ha: ((ha + 540) % 360) - 180 };
+}
+
+const lerp = (a, b, t) => a + (b - a) * t;
+const clamp01 = v => Math.max(0, Math.min(1, v));
+const smooth = v => { v = clamp01(v); return v * v * (3 - 2 * v); };
+
+// Look up a table keyed by sun altitude: rows of [alt, ...rgb arrays], interpolated.
+function keyed(table, alt) {
+  for (let i = 1; i < table.length; i++) if (alt <= table[i][0]) {
+    const a = table[i - 1], b = table[i], t = (alt - a[0]) / (b[0] - a[0]);
+    return a.slice(1).map((c, j) => c.map((v, k) => lerp(v, b[j + 1][k], t)));
+  }
+  return table.at(-1).slice(1);
+}
+
+// Sky colors keyed by sun altitude: [alt, zenith, horizon].
+const KEYS = [
+  [-90, [6, 8, 20], [12, 14, 34]],
+  [-18, [8, 10, 28], [22, 22, 52]],
+  [-10, [18, 22, 58], [64, 42, 88]],
+  [-4, [40, 52, 108], [214, 108, 92]],
+  [0, [64, 96, 160], [246, 160, 104]],
+  [6, [74, 132, 200], [246, 204, 150]],
+  [20, [70, 150, 224], [184, 222, 240]],
+  [90, [56, 140, 226], [170, 214, 240]]
+];
+function skyAt(alt) { const [zen, hor] = keyed(KEYS, alt); return { zen, hor }; }
+
+// Light coming in through each half of the window: moonless blue, dusk orange, white noon.
+const LIGHT = [
+  [-90, [0.24, 0.28, 0.48]],
+  [-12, [0.26, 0.29, 0.5]],
+  [-6, [0.36, 0.32, 0.52]],
+  [-2, [0.78, 0.5, 0.46]],
+  [2, [1.0, 0.68, 0.5]],
+  [8, [1.04, 0.9, 0.74]],
+  [20, [1.08, 1.04, 0.96]],
+  [90, [1.1, 1.08, 1.02]]
+];
+const AMB = [0.05, 0.05, 0.07], LAMP = [1.0, 0.66, 0.36];
+
+// 4x4 Bayer matrix: ordered dithering down to a few levels per channel, for the 8-bit banding.
+const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map(v => v / 16 - 0.5);
+// Quantized on a square-root scale, so the dark gets fine steps instead of a loud checkerboard.
+const LEVELS = 16;
+const q = (v, x, y) => {
+  const l = Math.round(Math.sqrt(Math.max(0, v) / 255) * (LEVELS - 1) + BAYER[(y & 3) * 4 + (x & 3)]);
+  return (Math.max(0, Math.min(LEVELS - 1, l)) / (LEVELS - 1)) ** 2 * 255;
+};
+
+// Integer hash of a few numbers into [0, 1), and a seeded generator for sequences.
+function hash(...ns) {
+  let h = 0x9e3779b9;
+  for (const n of ns) { h = Math.imul(h ^ (n | 0), 0x85ebca6b); h ^= h >>> 13; h = Math.imul(h, 0xc2b2ae35); h ^= h >>> 16; }
+  return (h >>> 0) / 4294967296;
+}
+function mulberry(a) {
+  return () => { a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+}
+
+// ---------------------------------------------------------------- the skies, in the window
+function rng(seed) { return () => (seed = (seed * 16807) % 2147483647) / 2147483647; }
+const STARS = PLACES.map(p => { const r = rng(Math.floor(hash(p.lat * 100, p.lon * 100) * 2147483645) + 1); return Array.from({ length: 28 }, () => [Math.floor(r() * HW), Math.floor(r() * (HZ - 6)), r() * 6.28]); });
+function skyline(side, x) { // window-local x and row
+  const hill = side === 0 ? HZ - 1 - Math.round(4 * Math.sin(x * 0.09) + 2 * Math.sin(x * 0.23 + 1)) // a basin's hills
+    : HZ + 1 - Math.round(2 * Math.sin(x * 0.06 + 2) + 1.5 * Math.sin(x * 0.16));                     // rolling country
+  const mark = PLACES[side].mark;
+  if (mark === "tower") { // a tall tiered tower
+    const t = x - 50;
+    if (t >= 0 && t < 7) { const tier = t >= 2 && t < 5 ? 26 : 20; return Math.min(hill, HZ - tier + Math.abs(3 - t)); }
+  } else if (mark === "tree") { // one tall tree
+    const t = x - 26;
+    if (t >= -3 && t <= 3) return Math.min(hill, HZ - 10 + Math.abs(t) * 2);
+  }
+  return hill;
+}
+function skyPixel(S, side, lx, wy) {
+  if (wy >= skyline(side, lx)) return S.sky.hor.map(v => v * 0.16); // land, tinted by the horizon light
+  const t = Math.pow(wy / HZ, 1.6);
+  let c = S.sky.zen.map((v, k) => lerp(v, S.sky.hor[k], t));
+  if (S.alt > -3) { // sun disc and glow
+    const dx = lx - S.sunX, dy = wy - S.sunY, r2 = dx * dx + dy * dy;
+    if (r2 <= 5) c = [255, 236, 190];
+    else c = c.map((v, k) => v + [70, 50, 20][k] * Math.exp(-r2 / 160) * Math.max(0, 1 - S.alt / 40));
+  }
+  return c;
+}
+
+// ---------------------------------------------------------------- the room, built once
+// Each pixel gets an albedo and a kind; every frame lights it with the window and the lamp.
+const albedo = new Float32Array(W * H * 3), kind = new Uint8Array(W * H), fg = new Uint8Array(W * H);
+const LIT = 0, GLASS = 1, SHADE = 2; // a lit surface, the window glass, the lamp shade
+function put(x, y, c, k = LIT, f = 0) {
+  if (x < 0 || y < 0 || x >= W || y >= H) return;
+  const j = y * W + x; albedo.set(c, j * 3); kind[j] = k; fg[j] = f;
+}
+const fore = (x, y, c, k) => put(x, y, c, k, 1); // in front of the cat
+const tint = (c, v) => c.map(n => n * v);
+const grain = (a, b) => hash(91, a, b);
+
+// Back wall: brick above, dark wood panels below a chair rail.
+for (let y = 0; y < WALL_BASE; y++) for (let x = 0; x < W; x++) {
+  let c;
+  if (y < 80) {
+    const row = y >> 2, off = (row & 1) * 4, bx = (x + off) >> 3;
+    c = (y & 3) === 3 || ((x + off) & 7) === 7 ? [46, 38, 36] : tint([108, 54, 42], 0.82 + 0.3 * grain(bx, row));
+  } else if (y < 82) c = [124, 86, 56];
+  else if (y >= 107) c = [46, 32, 24];
+  else c = x % 14 === 0 ? [40, 26, 18] : tint([72, 46, 32], 0.9 + 0.15 * grain(x >> 1, 7));
+  put(x, y, c);
+}
+// Floor: boards that widen toward us.
+const BOARDS = [112, 115, 119, 124, 130, 137, 144];
+for (let r = 0; r < BOARDS.length - 1; r++) for (let y = BOARDS[r]; y < BOARDS[r + 1]; y++) for (let x = 0; x < W; x++) {
+  const len = 24 + r * 8, off = Math.floor(grain(r, 3) * len), b = Math.floor((x + off) / len);
+  put(x, y, y === BOARDS[r] || (x + off) % len === 0 ? [40, 28, 20] : tint([80, 54, 36], 0.85 + 0.25 * grain(b, r + 20)));
+}
+// The window: arched glass in a wooden frame, a mullion in each half and one transom.
+// No mullion at the seam: the seam itself runs there.
+const arch = x => WIN.arch * (1 - Math.sqrt(Math.max(0, 1 - ((x - 127.5) / 80) ** 2)));
+const inWin = (x, y) => x >= WIN.x0 && x <= WIN.x1 && y <= WIN.y1 && y >= WIN.y0 + arch(x);
+for (let y = 3; y <= 59; y++) for (let x = 44; x <= 211; x++) {
+  if (inWin(x, y)) {
+    const bar = x === 88 || x === 167 || y === 32;
+    put(x, y, bar ? [104, 72, 46] : [0, 0, 0], bar ? LIT : GLASS);
+    continue;
+  }
+  let near = false;
+  for (let dy = -3; dy <= 3 && !near; dy++) for (let dx = -3; dx <= 3; dx++) if (inWin(x + dx, y + dy)) { near = true; break; }
+  if (near) put(x, y, [128, 90, 58]);
+}
+// The sill under the window, where cats lounge.
+for (let x = 40; x <= 216; x++) {
+  put(x, SILL_Y, [156, 112, 72]); put(x, SILL_Y + 1, [140, 100, 64]);
+  for (let y = SILL_Y + 2; y <= SILL_Y + 4; y++) put(x, y, [92, 62, 40]);
+  for (let y = SILL_Y + 5; y <= SILL_Y + 6; y++) { const j = (y * W + x) * 3; albedo[j] *= 0.55; albedo[j + 1] *= 0.55; albedo[j + 2] *= 0.55; }
+}
+// The stairs, seen from the side, from the floor up to the sill.
+const STEPS = 7, stepTop = x => Math.round(FLOOR_Y - (Math.min(STEPS - 1, Math.max(0, Math.floor((x - 6) / (36 / STEPS)))) + 1) * (FLOOR_Y - SILL_Y) / STEPS);
+for (let x = 6; x <= 44; x++) {
+  const top = stepTop(x), prev = x > 6 ? stepTop(x - 1) : top;
+  for (let y = top; y <= FLOOR_Y + 1; y++)
+    put(x, y, y === top || y < prev ? [196, 146, 96] : tint([124, 84, 54], 1 - 0.3 * (y - top) / 60));
+}
+// The bar counter, with a brass foot rail.
+for (let x = 194; x <= 253; x++) {
+  for (let y = 90; y <= 92; y++) put(x, y, y === 90 ? [176, 140, 100] : [150, 112, 74]);
+  for (let y = 93; y <= FLOOR_Y + 1; y++) {
+    const p = (x - 194) % 15;
+    put(x, y, y === 116 ? [168, 136, 70] : p === 0 || y === 93 || y === FLOOR_Y + 1 ? [52, 34, 24]
+      : (p === 2 || p === 12) && y > 96 && y < 112 ? [92, 62, 42] : [74, 48, 32]);
+  }
+}
+// The tiny kitty speaker on the counter: a cat's head with a round grille.
+// It sits at the near end of the counter, so it stays in frame on a phone.
+const GRILLE = [], SPK = 196;
+for (let y = 82; y <= 89; y++) for (let x = SPK; x <= SPK + 9; x++)
+  if (!((y === 82 || y === 89) && (x === SPK || x === SPK + 9))) put(x, y, [96, 90, 104]);
+for (const [x, y] of [[0, 81], [1, 81], [0, 80], [9, 81], [8, 81], [9, 80]]) put(SPK + x, y, [96, 90, 104]);
+for (let y = 84; y <= 88; y++) for (let x = SPK + 2; x <= SPK + 7; x++)
+  if ((x + y) % 2 === 0 && (x - SPK - 4.5) ** 2 + (y - 86) ** 2 <= 6.5) { put(x, y, [176, 166, 180]); GRILLE.push(y * W + x); }
+
+// Foreground: the whole table, two empty chairs, and the lamp on the table.
+function chair(mirror) {
+  const X = x => mirror ? W - 1 - x : x, c = [172, 120, 74], d = [120, 80, 50];
+  for (let y = 88; y <= 136; y++) { fore(X(70), y, d); fore(X(71), y, c); } // back post into back leg
+  for (let x = 70; x <= 73; x++) fore(X(x), 88, [200, 150, 96]);            // top of the back
+  for (const y of [94, 95, 102, 103]) for (let x = 72; x <= 73; x++) fore(X(x), y, c);
+  for (let x = 70; x <= 90; x++) { fore(X(x), 112, [200, 150, 96]); fore(X(x), 113, c); fore(X(x), 114, d); } // seat
+  for (let y = 115; y <= 136; y++) { fore(X(89), y, c); fore(X(90), y, d); }  // front leg
+}
+chair(false); chair(true);
+for (let x = 92; x <= 164; x++) { fore(x, 98, [210, 160, 104]); fore(x, 99, [176, 124, 78]); fore(x, 100, [140, 96, 60]); fore(x, 101, [80, 52, 34]); }
+for (let y = 102; y <= 133; y++) for (let x = 126; x <= 130; x++) fore(x, y, x === 126 ? [90, 60, 38] : [140, 96, 60]);
+for (let x = 110; x <= 146; x++) for (let y = 134; y <= 136; y++) fore(x, y, y === 134 ? [170, 120, 76] : [100, 68, 44]);
+for (let x = 124; x <= 132; x++) fore(x, 97, [160, 128, 70]);
+for (let x = 126; x <= 130; x++) fore(x, 96, [160, 128, 70]);
+for (let y = 89; y <= 95; y++) fore(128, y, [150, 120, 64]);
+for (let y = 81; y <= 88; y++) { const h = Math.round(3 + (y - 81) * 0.7); for (let x = 128 - h; x <= 128 + h; x++) fore(x, y, [226, 206, 168], SHADE); }
+
+// How the window light reaches each pixel, fixed by the architecture:
+// mixR is how much of it comes from the right half (sharp right under the window, a soft
+// blend by the time it reaches the table); reach is how much window light gets there at all.
+const mixR = new Float32Array(W * H), reach = new Float32Array(W * H), lampW = new Float32Array(W * H);
+for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+  const j = y * W + x, spread = lerp(3, 60, clamp01((y - 58) / 45)), out = Math.max(0, WIN.x0 - x, x - WIN.x1);
+  mixR[j] = smooth((x - 127.5) / (2 * spread) + 0.5);
+  reach[j] = Math.exp(-((out / 55) ** 2)) * (y < 6 ? 0.6 : 1 - 0.35 * clamp01((y - 60) / 84));
+  lampW[j] = 1.4 / (1 + ((x - 128) ** 2 + ((y - 86) * 1.2) ** 2) / 500);
+}
+
+// ---------------------------------------------------------------- the cat
+// One cat, born from a seed (?seed=N to meet another), the same one as in cat-at-the-seam.
+const SEED = parseInt(new URLSearchParams(location.search).get("seed"), 10) || 2110;
+
+// Value noise, two octaves, for the coat.
+function vnoise(x, y) {
+  const xi = Math.floor(x), yi = Math.floor(y), sx = smooth(x - xi), sy = smooth(y - yi);
+  return lerp(lerp(hash(SEED, xi, yi), hash(SEED, xi + 1, yi), sx), lerp(hash(SEED, xi, yi + 1), hash(SEED, xi + 1, yi + 1), sx), sy);
+}
+const fbm = (x, y) => (vnoise(x, y) * 2 + vnoise(x * 2.1 + 5, y * 2.1 + 9)) / 3;
+
+// Coat tones as [base, dark] albedo.
+const TONES = [
+  [[214, 130, 62], [150, 76, 34]],   // orange
+  [[150, 116, 80], [64, 48, 34]],    // brown
+  [[128, 132, 142], [76, 80, 94]],   // grey
+  [[40, 36, 42], [22, 20, 24]],      // black
+  [[230, 204, 164], [196, 150, 106]] // cream
+];
+const WHITE = [236, 232, 222];
+
+function birth(seed) {
+  const r = mulberry(seed);
+  // Hidden temperament on five real feline dimensions. Never displayed; it only shows in behavior.
+  const mind = { skittish: r(), outgoing: r(), dominance: r(), impulsive: r(), friendly: r() };
+  const body = { len: 6.4 + r() * 1.3, chub: 0.9 + r() * 0.3, leg: 0.85 + r() * 0.3, head: 0.92 + r() * 0.18, ear: 1.4 + r() * 1.0, tail: 0.8 + r() * 0.4 };
+  const roll = r();
+  const pattern = roll < 0.28 ? "solid" : roll < 0.75 ? "tabby" : "tortie";
+  const tone = TONES[Math.floor(r() * TONES.length)];
+  const white = r() < 0.45 ? 0.2 + r() * 0.5 : 0;
+  return { mind, body, coat: { pattern, tone, white } };
+}
+const CAT = birth(SEED);
+
+// Albedo at a point in a body part's own coordinates (cu, cv), so the coat moves with the body.
+// wm says how likely this spot is to be white (belly, chest, paws, muzzle).
+function coat(part, cu, cv, wm) {
+  const { pattern, tone, white } = CAT.coat, o = part * 17.3;
+  const n = fbm(cu * 0.35 + o, cv * 0.35 - o);
+  if (white && wm + (n - 0.5) * 0.6 > 1 - white) return WHITE;
+  let [base, dark] = tone;
+  if (pattern === "tortie") [base, dark] = fbm(cu * 0.22 + o + 40, cv * 0.22) > 0.5 ? TONES[0] : TONES[3];
+  if (pattern === "tabby" && Math.sin(cu * 1.25 + n * 3.2) > 0.35) return base.map((v, k) => lerp(v, dark[k], 0.85));
+  return base.map((v, k) => lerp(v, dark[k], n * 0.35));
+}
+
+// Poses, facing right, in pixels from the point on the ground under the cat.
+// Each is the same set of shapes, so any two can be blended number by number.
+//   body/haunch: ellipse [cx, cy, rx, ry, angle]   neck: capsule [ax, ay, bx, by, r]
+//   head: circle [x, y, r]   legs: [far back, far front, near back, near front] as [ax, ay, bx, by]
+//   tail: quadratic curve [x0, y0, x1, y1, x2, y2, r]   front: 1 when the tail wraps in front
+function walkPose(phase, amp) {
+  const c = CAT.body, L = c.len, B = c.chub, up = CAT.mind.friendly, tl = c.tail; // a friendly cat carries its tail high
+  const bob = Math.sin(phase * 4 * Math.PI) * amp, cy = -(4.4 * c.leg + 2.3 * B) + 0.25 * bob;
+  // Lateral-sequence walk: each foot a quarter cycle after the last.
+  const legs = [[-L + 2.3, 0.5], [L - 2.1, 0.75], [-L + 3.0, 0], [L - 1.4, 0.25]].map(([x, off]) => {
+    const a = (phase + off) * 2 * Math.PI;
+    return [x, cy + 1.2, x + Math.sin(a) * 1.7 * amp, -1.1 - Math.max(0, Math.cos(a)) * 1.1 * amp];
+  });
+  return {
+    body: [0, cy, L, 3.1 * B, 0],
+    haunch: [-L + 2.8, cy + 0.3, 3.0, 3.1 * B, 0],
+    neck: [L - 2.4, cy - 0.8, L + 0.6, cy - 3, 2.1],
+    head: [L + 1.7, cy - 3.6 + 0.2 * bob, 2.9 * c.head],
+    legs,
+    tail: [-L + 0.6, cy - 1, -L - 3 * tl, cy - 1 - 3 * up * tl, -L - (3.5 - 2 * up) * tl, cy + (2 - 9 * up) * tl, 1.05],
+    front: 0
+  };
+}
+function standPose() { // still, head a little lower, sniffing the air
+  const p = walkPose(0, 0);
+  p.head = [p.head[0] + 0.3, p.head[1] + 0.9, p.head[2]];
+  return p;
+}
+function sitPose() {
+  const c = CAT.body, L = c.len, B = c.chub, h = 4.6 * c.leg;
+  return {
+    body: [-0.8, -2.2 - h * 0.8, L * 0.72, 3.2 * B, -1.05],
+    haunch: [-2.6, -3 * B, 3.6 * B, 3 * B, 0],
+    neck: [0.8, -h - 4.4, 1.9, -h - 6.6, 2.0],
+    head: [2.6, -h - 8, 2.9 * c.head],
+    legs: [[-1.8, -2, 0.6, -1.1], [1.2, -h - 1, 1.6, -1.1], [-1.2, -2, 1.2, -1.1], [2, -h - 1, 2.4, -1.1]],
+    tail: [-5.2, -1.3, -1.5, -0.4, 3.5, -1.2, 1.0],
+    front: 1
+  };
+}
+function loafPose() {
+  const c = CAT.body, L = c.len, B = c.chub;
+  return {
+    body: [0.2, -3.5 * B, L * 0.95, 3.5 * B, 0],
+    haunch: [-L + 2.6, -3.3 * B, 3.1 * B, 3.3 * B, 0],
+    neck: [L - 3.2, -4.6 * B, L - 1.3, -6 * B, 2.1],
+    head: [L - 0.5, -6.6 * B - 0.4, 2.9 * c.head],
+    legs: [[-L + 3, -3, -L + 3, -3], [L - 2.6, -1.4, L - 1.4, -1.2], [-L + 3, -3, -L + 3, -3], [L - 2, -1.3, L - 0.7, -1.1]],
+    tail: [-L + 0.4, -2.2, -2.5, -0.6, 2.5, -1.0, 1.0],
+    front: 1
+  };
+}
+const mix = (a, b, w) => typeof a === "number" ? lerp(a, b, w) : a.map((v, i) => mix(v, b[i], w));
+const blend = (a, b, w) => Object.fromEntries(Object.keys(a).map(k => [k, mix(a[k], b[k], w)]));
+
+// Where a cat can go, as one line folded through the room: along the sill (right to left),
+// down the stairs, then along the floor behind the table. Positions are distances along it.
+const PATH = [[214, SILL_Y], [37, SILL_Y], [1, FLOOR_Y], [186, FLOOR_Y]]; // the stairs leg runs along the step edges
+const SEGS = [];
+for (let i = 1, s = 0; i < PATH.length; i++) {
+  const [ax, ay] = PATH[i - 1], [bx, by] = PATH[i], len = Math.hypot(bx - ax, by - ay);
+  SEGS.push({ ax, ay, dx: (bx - ax) / len, dy: (by - ay) / len, s0: s, len }); s += len;
+}
+const TOTAL = SEGS.at(-1).s0 + SEGS.at(-1).len, SILL_END = SEGS[0].len, STAIRS_END = SEGS[1].s0 + SEGS[1].len;
+function along(s) {
+  s = Math.max(0, Math.min(TOTAL, s));
+  const g = SEGS.find(g => s <= g.s0 + g.len) || SEGS.at(-1), u = s - g.s0;
+  return { x: g.ax + g.dx * u, y: g.ay + g.dy * u, dx: g.dx, dy: g.dy };
+}
+const facingAt = (s, way) => (Math.sign(along(s).dx) * way) || 1;
+function tiltAt(s, dir) { // lean into the slope (a little less than the stairs), eased over the corners
+  let t = 0;
+  for (const o of [-5, 0, 5]) { const g = along(s + o), f = Math.sign(g.dx) === dir ? 1 : -1; t += Math.atan2(g.dy * f, Math.abs(g.dx)); }
+  return t / 3 * 0.6;
+}
+
+// The cat's day, planned in 10-minute spans. Each span is computed fresh from (seed, span index):
+// it starts where the last one ends, wanders between spots, and rests; sometimes it goes up to the sill.
+const SPAN = 600, STRIDE = 7, SPEED = 2.4 + 1.4 * CAT.mind.impulsive; // px per second: slow
+function spot(r) {
+  const m = CAT.mind;
+  if (r() < 0.15 + 0.3 * m.skittish) return 8 + r() * (SILL_END - 16);                 // skittish cats like it high
+  if (r() < m.dominance * 0.5) return STAIRS_END + 122 + (r() - 0.5) * 40;             // dominant ones keep near the table
+  return STAIRS_END + 8 + r() * (TOTAL - STAIRS_END - 12);
+}
+const spanStart = k => spot(mulberry(Math.floor(hash(SEED, k, 1) * 4294967296)));
+let cached = { k: NaN, ev: null };
+function plan(k) {
+  if (cached.k === k) return cached.ev;
+  const r = mulberry(Math.floor(hash(SEED, k, 2) * 4294967296)), m = CAT.mind;
+  const ev = [], end = spanStart(k + 1);
+  let s = spanStart(k), t = 0, dist = 0, way = hash(SEED, k, 3) < 0.5 ? -1 : 1;
+  const rest = (pose, dur, sill = false) => { ev.push({ pose, sill, t0: t, t1: t + dur, s0: s, s1: s, d0: dist, way }); t += dur; };
+  const walk = to => {
+    if (Math.abs(to - s) < 1) return;
+    if (Math.sign(to - s) !== way) { way = -way; rest("stand", 1 + r() * 1.5); } // turning around: a short look back
+    const dur = Math.abs(to - s) / SPEED;
+    ev.push({ pose: null, t0: t, t1: t + dur, s0: s, s1: to, d0: dist, way });
+    t += dur; dist += Math.abs(to - s); s = to;
+  };
+  for (;;) {
+    let to = spot(r);
+    for (let i = 0; i < 3 && Math.abs(to - s) < 12; i++) to = spot(r);
+    if (t + (Math.abs(to - s) + Math.abs(end - to)) / SPEED + 100 > SPAN) break; // leave time to get to the next span's start
+    walk(to);
+    if (to < SILL_END) { // up on the sill: settle and watch the skies
+      if (r() < 0.65) rest("loaf", 30 + r() * 60, true); else rest("sit", 10 + r() * 20, true);
+    } else if (r() < 0.3 + 0.35 * (1 - m.impulsive)) { // calm cats stop more; relaxed ones loaf
+      const p = r();
+      if (p < 0.2 + 0.35 * (1 - m.skittish)) rest("loaf", 20 + r() * 35);
+      else if (p < 0.75) rest("sit", 6 + r() * 18);
+      else rest("stand", 2 + r() * 4);
+    }
+  }
+  walk(end);
+  rest(SPAN - t > 12 ? "sit" : "stand", SPAN - t, end < SILL_END);
+  return (cached = { k, ev }).ev;
+}
+
+// Where the cat is and how it holds itself at a moment (seconds since 1970).
+function catAt(sec) {
+  const k = Math.floor(sec / SPAN), local = sec - k * SPAN, ev = plan(k);
+  const e = ev.find(e => local < e.t1) || ev.at(-1);
+  const s = lerp(e.s0, e.s1, clamp01((local - e.t0) / (e.t1 - e.t0)));
+  const phase = (e.d0 + Math.abs(s - e.s0)) / STRIDE; // tied to distance, so the feet don't slide
+  const g = along(s), dir = facingAt(s, e.way);
+  let pose, asleep = false;
+  if (!e.pose) pose = walkPose(phase, 1);
+  else {
+    const edge = Math.min(local - e.t0, e.t1 - local);
+    const target = e.pose === "sit" ? sitPose() : e.pose === "loaf" ? loafPose() : standPose();
+    if (e.sill) target.head[1] -= 1.2; // chin up, looking out
+    pose = blend(walkPose(phase, 1 - smooth(edge / 0.5)), target, smooth(edge / 1.4));
+    asleep = e.pose === "loaf" && !e.sill && edge > 6;
+  }
+  pose.body[3] *= 1 + 0.035 * Math.sin(sec * 2.2); // breathing
+  pose.tail[4] += Math.sin(sec * 1.7 + SEED) * 0.7 * (0.4 + CAT.mind.impulsive); // tail tip never quite still
+  const b = sec / 3.3, blink = b % 1 < 0.045 && hash(SEED, Math.floor(b), 9) < 0.7;
+  return { x: Math.round(g.x), y: Math.round(g.y), dir, tilt: tiltAt(s, dir), pose, eyesShut: asleep || blink };
+}
+
+// Shape tests in the cat's local frame. Each hit returns coat coordinates and a surface normal.
+function hitEllipse([cx, cy, rx, ry, a], x, y) {
+  const dx = x - cx, dy = y - cy, ca = Math.cos(a), sa = Math.sin(a);
+  const u = (dx * ca + dy * sa) / rx, v = (-dx * sa + dy * ca) / ry, r2 = u * u + v * v;
+  if (r2 > 1) return null;
+  return { u, v, cu: u * rx, cv: v * ry, nx: u * ca - v * sa, ny: u * sa + v * ca, nz: Math.sqrt(1 - r2) };
+}
+function hitCapsule([ax, ay, bx, by, r], x, y) {
+  const ex = bx - ax, ey = by - ay, len2 = ex * ex + ey * ey || 1e-6;
+  const t = clamp01(((x - ax) * ex + (y - ay) * ey) / len2), px = x - (ax + ex * t), py = y - (ay + ey * t);
+  const d = Math.hypot(px, py);
+  if (d > r) return null;
+  const v = (ex * py - ey * px) / Math.sqrt(len2) / r;
+  return { u: t, v, cu: t * Math.sqrt(len2), cv: v * r, nx: px / r, ny: py / r, nz: Math.sqrt(Math.max(0, 1 - (d / r) ** 2)) };
+}
+function hitTri([ax, ay, bx, by, cx, cy], x, y) {
+  const d = (by - cy) * (ax - cx) + (cx - bx) * (ay - cy);
+  const l1 = ((by - cy) * (x - cx) + (cx - bx) * (y - cy)) / d, l2 = ((cy - ay) * (x - cx) + (ax - cx) * (y - cy)) / d;
+  if (l1 < 0 || l2 < 0 || l1 + l2 > 1) return null;
+  return { u: 0, v: 0, cu: x * 2, cv: y * 2, nx: 0, ny: -0.5, nz: 0.86 };
+}
+
+// Parts: 0 body, 1 haunch, 2 head, 3 neck, 4 leg, 5 tail, 6 ear. Painter's order, back to front.
+function shapes(p) {
+  const tail = [], [ax, ay, bx, by, ex, ey, tr] = p.tail, n = 7;
+  for (let i = 1, px = ax, py = ay; i <= n; i++) {
+    const s = i / n, m = 1 - s, qx = m * m * ax + 2 * m * s * bx + s * s * ex, qy = m * m * ay + 2 * m * s * by + s * s * ey;
+    tail.push({ hit: hitCapsule, part: 5, g: [px, py, qx, qy, tr * (1 - 0.3 * s)], tu: (i - 0.5) / n });
+    px = qx; py = qy;
+  }
+  const leg = (g, dim) => ({ hit: hitCapsule, part: 4, g: [...g, 1.05], dim });
+  const [hx, hy, hr] = p.head, e = CAT.body.ear;
+  return [
+    ...(p.front < 0.5 ? tail : []),
+    leg(p.legs[0], 0.72), leg(p.legs[1], 0.72),
+    { hit: hitEllipse, part: 0, g: p.body },
+    { hit: hitEllipse, part: 1, g: p.haunch },
+    leg(p.legs[2]), leg(p.legs[3]),
+    ...(p.front >= 0.5 ? tail : []),
+    { hit: hitCapsule, part: 3, g: p.neck },
+    { hit: hitTri, part: 6, g: [hx - 1.9, hy - 1.6, hx - 0.1, hy - 2.7, hx - 1.3, hy - 2.2 - e], dim: 0.8 },
+    { hit: hitEllipse, part: 2, g: [hx, hy, hr, hr, 0] },
+    { hit: hitTri, part: 6, g: [hx + 0.1, hy - 2.8, hx + 1.9, hy - 1.8, hx + 1.3, hy - 2.4 - e] }
+  ];
+}
+
+// How likely a spot is to be white, by part: belly and chest, socks, muzzle, tail tip.
+function whiteness(s, h) {
+  switch (s.part) {
+    case 0: return (h.v + 1) * 0.45 + (h.u > 0.55 ? 0.35 : 0);
+    case 1: return (h.v + 1) * 0.45;
+    case 2: return h.u > 0.15 && h.v > -0.1 ? 0.65 + h.v * 0.3 : 0.05;
+    case 3: return 0.4 + h.v * 0.4;
+    case 4: return 0.25 + h.u * 0.8;
+    case 5: return 0.05 + s.tu * 0.35;
+    default: return 0;
+  }
+}
+
+const light = new Float32Array(W * H * 3); // this frame's light at every pixel, shared by the room and the cat
+const catMask = new Uint8Array(W * H);     // which part of the cat covers each pixel, +1; 0 = none
+function drawCat(d, cat) {
+  const list = shapes(cat.pose), { x: cx, y: gy, dir, tilt } = cat, ca = Math.cos(tilt), sa = Math.sin(tilt);
+  const x0 = Math.max(1, cx - 20), x1 = Math.min(W - 2, cx + 20), y0 = Math.max(1, gy - 26), y1 = Math.min(H - 2, gy + 8);
+  catMask.fill(0);
+  for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+    const j = y * W + x;
+    if (fg[j]) continue; // behind the table and chairs
+    const sx = (x + 0.5 - cx) * dir, sy = y + 0.5 - gy, lx = sx * ca + sy * sa, ly = -sx * sa + sy * ca;
+    if (ly > 0) continue;
+    let s = null, h = null;
+    for (const sh of list) { const r = sh.hit(sh.g, lx, ly); if (r) { s = sh; h = r; } }
+    if (!s) continue;
+    // Lit by the room's light where it stands: on the sill each half's sky, by the table the mix.
+    const albedo = coat(s.part, s.tu !== undefined ? s.tu * 12 : h.cu, h.cv, whiteness(s, h));
+    const shade = (0.5 + 0.6 * Math.max(0, -0.8 * h.ny + 0.6 * h.nz)) * (s.dim || 1);
+    for (let k = 0; k < 3; k++) d[j * 4 + k] = q(albedo[k] * light[j * 3 + k] * shade, x, y);
+    catMask[j] = s.part + 1;
+  }
+  // The eye: one pixel, dark in good light, a faint green shine in the dark. Shut when blinking or asleep.
+  const [hx, hy] = cat.pose.head, elx = hx + 1.2, ely = hy - 0.5;
+  const ex = Math.floor(cx + (elx * ca - ely * sa) * dir), ey = Math.floor(gy + elx * sa + ely * ca), ej = ey * W + ex;
+  if (catMask[ej] === 3) {
+    const i = ej * 4, L = [0, 1, 2].map(k => light[ej * 3 + k]), shine = clamp01(1 - (L[0] + L[1] + L[2]) / 1.5);
+    const c = cat.eyesShut ? [d[i] * 0.55, d[i + 1] * 0.55, d[i + 2] * 0.55]
+      : [20, 18, 14].map((v, k) => v * L[k] + [90, 140, 70][k] * shine * 0.7);
+    for (let k = 0; k < 3; k++) d[i + k] = q(c[k], ex, ey);
+  }
+  // A one-pixel outline, like an old sprite: dark against light, a faint pale rim against the dark.
+  for (let y = y0 - 1; y <= y1 + 1; y++) for (let x = x0 - 1; x <= x1 + 1; x++) {
+    const j = y * W + x;
+    if (catMask[j] || fg[j] || !(catMask[j - 1] || catMask[j + 1] || catMask[j - W] || catMask[j + W])) continue;
+    const i = j * 4, lum = (d[i] + d[i + 1] + d[i + 2]) / 3;
+    for (let k = 0; k < 3; k++) d[i + k] = lum < 48 ? d[i + k] + [30, 32, 44][k] : d[i + k] * 0.45;
+  }
+}
+
+// ---------------------------------------------------------------- music from the kitty speaker
+// Soft chords and a few loose notes. A tiny speaker (band-limited), at the bar on the right,
+// heard through the room's reverb. Off until asked for; browsers won't play sound unprompted.
+let music = null, musicOn = false;
+function startMusic() {
+  const ac = new AudioContext(), bus = ac.createGain(), hp = ac.createBiquadFilter(), lp = ac.createBiquadFilter();
+  hp.type = "highpass"; hp.frequency.value = 140; lp.type = "lowpass"; lp.frequency.value = 2800;
+  const pan = ac.createStereoPanner(); pan.pan.value = 0.55;
+  const room = ac.createConvolver(), n = Math.floor(ac.sampleRate * 1.8), ir = ac.createBuffer(2, n, ac.sampleRate);
+  for (let ch = 0; ch < 2; ch++) { const a = ir.getChannelData(ch); for (let i = 0; i < n; i++) a[i] = (Math.random() * 2 - 1) * (1 - i / n) ** 3; }
+  room.buffer = ir;
+  const dry = ac.createGain(), wet = ac.createGain(), out = ac.createGain(), meter = ac.createAnalyser();
+  dry.gain.value = 0.7; wet.gain.value = 0.45; out.gain.value = 7;
+  const comp = ac.createDynamicsCompressor(); // keeps it audible without clipping
+  comp.threshold.value = -24; comp.ratio.value = 6; comp.attack.value = 0.01; comp.release.value = 0.3;
+  bus.connect(hp).connect(lp).connect(pan);
+  pan.connect(dry).connect(out); pan.connect(room).connect(wet).connect(out);
+  bus.connect(meter); out.connect(comp).connect(ac.destination);
+  const CHORDS = [[53, 57, 60, 64], [52, 55, 59, 62], [50, 53, 57, 60], [48, 52, 55, 59]], BAR = 4.8, PENTA = [72, 74, 76, 79, 81];
+  const hz = m => 440 * 2 ** ((m - 69) / 12);
+  function note(m, t, len, vol, type) {
+    const g = ac.createGain();
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vol, t + 0.04); g.gain.exponentialRampToValueAtTime(0.0001, t + len);
+    g.connect(bus);
+    for (const det of type === "sine" ? [0] : [-6, 6]) {
+      const o = ac.createOscillator(); o.type = type; o.frequency.value = hz(m); o.detune.value = det;
+      o.connect(g); o.start(t); o.stop(t + len + 0.05);
+    }
+  }
+  let next = ac.currentTime + 0.1, bar = 0;
+  setInterval(() => {
+    while (next < ac.currentTime + 1) {
+      CHORDS[bar % 4].forEach((m, i) => note(m, next + i * 0.03, BAR * 0.95, 0.12, "triangle"));
+      for (let b = 0; b < 4; b++) if (Math.random() < 0.45) note(PENTA[Math.floor(Math.random() * 5)], next + b * BAR / 4 + 0.05, 1.4, 0.16, "sine");
+      next += BAR; bar++;
+    }
+  }, 250);
+  return { ac, meter, buf: new Uint8Array(meter.fftSize) };
+}
+function musicLevel() {
+  if (!musicOn) return 0;
+  music.meter.getByteTimeDomainData(music.buf);
+  let sum = 0;
+  for (const v of music.buf) sum += ((v - 128) / 128) ** 2;
+  return clamp01(Math.sqrt(sum / music.buf.length) * 3);
+}
+const NOTE = [[1, 0], [2, 0], [1, 1], [1, 2], [0, 3], [1, 3]]; // a tiny eighth note
+
+// ---------------------------------------------------------------- each frame
+let fast = false, simTime = Date.now(), last = performance.now(), lampLevel = 0;
+const fmt = (d, tz) => d.toLocaleTimeString("en-GB", { timeZone: tz, hour: "2-digit", minute: "2-digit" });
+
+function frame(now) {
+  if (now - last < 66) { requestAnimationFrame(frame); return; } // about 15 frames a second, like animation on twos
+  const dt = now - last;
+  simTime += fast ? dt * 1440 : dt; // fast: 24 h per real minute
+  if (!fast) simTime = Date.now();
+  last = now;
+  const date = new Date(simTime), d = img.data;
+  const suns = PLACES.map(p => sun(date, p.lat, p.lon));
+  const S = suns.map(({ alt, ha }) => ({
+    alt, sky: skyAt(alt), night: clamp01((-alt - 4) / 10),
+    sunX: Math.round(HW / 2 + (ha / 90) * (HW / 2)), sunY: Math.round(HZ - (alt / 60) * HZ),
+    col: keyed(LIGHT, alt)[0].map(v => v * 0.8)
+  }));
+  // The lamp on the table comes on at dusk on the left side and goes off at its dawn.
+  lampLevel = lerp(lampLevel, suns[0].alt < -3 ? 1 : 0, Math.min(1, dt / 300));
+
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const j = y * W + x, i = j * 4;
+    let c;
+    if (kind[j] === GLASS) {
+      const side = x < SEAM ? 0 : 1;
+      c = skyPixel(S[side], side, x - (side ? SEAM : WIN.x0), y - WIN.y0);
+    } else {
+      const m = mixR[j], r = reach[j], lw = lampLevel * lampW[j];
+      c = [0, 1, 2].map(k => {
+        const l = AMB[k] + r * lerp(S[0].col[k], S[1].col[k], m) + lw * LAMP[k];
+        light[j * 3 + k] = l;
+        return albedo[j * 3 + k] * l;
+      });
+      if (kind[j] === SHADE) c = c.map((v, k) => lerp(v, [255, 204, 136][k], lampLevel * 0.9));
+    }
+    d[i] = q(c[0], x, y); d[i + 1] = q(c[1], x, y); d[i + 2] = q(c[2], x, y); d[i + 3] = 255;
+  }
+  for (let side = 0; side < 2; side++) if (S[side].night > 0) for (const [sx, sy, ph] of STARS[side]) {
+    const x = (side ? SEAM : WIN.x0) + sx, y = WIN.y0 + sy, j = y * W + x;
+    if (kind[j] !== GLASS || sy >= skyline(side, sx)) continue;
+    const tw = S[side].night * (0.6 + 0.4 * Math.sin(now / 700 + ph));
+    if (tw < 0.25) continue;
+    const v = Math.round(lerp(d[j * 4], 235, tw));
+    d[j * 4] = d[j * 4 + 1] = v; d[j * 4 + 2] = Math.min(255, v + 10);
+  }
+  // Window light on the sill: the glass pixels above it light the cat with that half's sky.
+  for (let x = WIN.x0; x <= WIN.x1; x++) for (let y = WIN.y0; y <= WIN.y1; y++) {
+    const j = y * W + x;
+    if (kind[j] !== GLASS) continue;
+    const c = S[x < SEAM ? 0 : 1].col;
+    for (let k = 0; k < 3; k++) light[j * 3 + k] = AMB[k] + c[k] * 1.1;
+  }
+
+  // The kitty speaker's grille breathes with the music, and notes drift up from it.
+  const level = musicLevel();
+  if (level > 0) for (const j of GRILLE) for (let k = 0; k < 3; k++) d[j * 4 + k] = Math.min(255, d[j * 4 + k] * (1 + level * 0.8));
+  if (musicOn) for (let n = 0; n < 3; n++) {
+    const p = (now / 3200 + n / 3) % 1, nx = Math.round(SPK + 4 + n * 2 + Math.sin(p * 6 + n) * 3), ny = Math.round(78 - p * 20);
+    for (const [ox, oy] of NOTE) {
+      const j = (ny + oy) * W + nx + ox;
+      for (let k = 0; k < 3; k++) d[j * 4 + k] = lerp(d[j * 4 + k], [236, 224, 190][k], (1 - p) * 0.75);
+    }
+  }
+
+  // The cat keeps real time even when the skies run fast, so it stays a cat and not a blur.
+  drawCat(d, catAt(Date.now() / 1000));
+
+  // The seam: a thin line in the back wall, up through the window. Faint where the cat crosses it.
+  for (let y = 0; y < WALL_BASE; y += 2) {
+    const j = y * W + SEAM, i = j * 4;
+    if (fg[j] || (y >= SILL_Y && y <= SILL_Y + 6)) continue;
+    const a = catMask[j] ? 0.3 : kind[j] === GLASS ? 0.55 : 0.3;
+    for (let k = 0; k < 3; k++) d[i + k] = lerp(d[i + k], [214, 206, 188][k], a);
+  }
+  ctx.putImageData(img, 0, 0);
+
+  document.getElementById("nA").textContent = PLACES[0].label;
+  document.getElementById("nB").textContent = PLACES[1].label;
+  document.getElementById("tA").textContent = fmt(date, PLACES[0].tz);
+  document.getElementById("tB").textContent = fmt(date, PLACES[1].tz);
+  const lit = suns.map(s => s.alt > -0.833);
+  document.getElementById("state").textContent =
+    lit[0] && lit[1] ? "both skies lit" : !lit[0] && !lit[1] ? "shared dark" : "";
+  requestAnimationFrame(frame);
+}
+
+const bNow = document.getElementById("now"), bFast = document.getElementById("fast"), bMusic = document.getElementById("music");
+bNow.onclick = () => { fast = false; bNow.ariaPressed = "true"; bFast.ariaPressed = "false"; };
+bFast.onclick = () => { fast = true; simTime = Date.now(); bNow.ariaPressed = "false"; bFast.ariaPressed = "true"; };
+bMusic.onclick = () => {
+  if (!music) music = startMusic();
+  musicOn = !musicOn;
+  musicOn ? music.ac.resume() : music.ac.suspend();
+  bMusic.ariaPressed = String(musicOn);
+};
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
