@@ -874,30 +874,26 @@ const SEATED = {
     },
     eye: [18, 8], skin: "S",
     rows: [
-      [0, 14, "oooo"], [1, 11, "oooyYYyo"], [2, 9, "oohyyYYyyo"], [3, 8, "ohhhyyyYyyo"], [4, 7, "oHhhhyyyhyyho"],
-      [5, 7, "oHHhhhhhyhhSSo"], [6, 7, "oHHHhhhhhSSSSo"], [7, 7, "oHHHhhdSSSSbbSo"], [8, 7, "oHHhdssSSSSeSSo"],
-      [9, 7, "oHHsdSdsSSSSSSSo"], [10, 7, "oHhsdddsSSSSSSSSo"], [11, 8, "oHssssSSSSSSsddo"], [12, 9, "odssSSSSSSSmmo"],
-      [13, 10, "odssSSSSSSSo"], [14, 11, "oddssSSSSso"], [15, 12, "odsssooooo"], [16, 11, "oddssdo"],
-      [17, 7, "ojJJKKJWWsWo"], [18, 6, "ojJJKKKJLWTWo"], [19, 5, "ojJJJKKKJLWTWo"], [20, 5, "ojJJJJKKJJLTWo"],
-      [21, 5, "ojjJJJJKJJJLTo"], [22, 4, "ojjJJJJJJWJJLTo"], [23, 4, "ojjJJJJJJJJJJLo"], [24, 4, "ojjjJJJJJJJJJJo"],
-      [25, 4, "ojjjJJJJJJJJJJo"], [26, 4, "ojjjJJJJJJJJJo"], [27, 4, "ojjjJJJJJJJJJo"], [28, 4, "ojjjJJJJJJJJo"],
-      [29, 4, "ojjjJJJJJJJJo"], [30, 4, "ojjjJJJJJJJJo"], [31, 4, "ojjjJJJJJJJJo"], [32, 4, "ojjjJJJJJJJJo"],
-      [33, 4, "ojjjJJJJJJJJJo"], [34, 4, "ojjjJJJJJJJJJo"], [35, 4, "ojjjjJJJJJJJJJo"], [36, 4, "ojjjjJJJJJJJJJo"],
-      [37, 4, "ojjjjjJJJJJJJJo"],
+      // longer, messy golden-brown hair over the ears and down to the collar; a clean profile
+      [1, 11, "ooooo"], [2, 9, "oohyyYyoo"], [3, 7, "oohhyyYYyyho"], [4, 6, "ohhhhyyyYyyyho"], [5, 6, "oHhhhhyyyhyyyho"],
+      [6, 5, "oHHhhhhhyhhyhSSo"], [7, 5, "oHHHhhhhhhyhSSbo"], [8, 5, "oHHHhhhhHsSSSeSSo"], [9, 5, "oHHHhhhhHdsSSSSSSo"],
+      [10, 5, "oHHHhhhhHdssSSSSSSo"], [11, 5, "oHHHhhhHHdsSSSSSdo"], [12, 6, "oHHhhhHHdsSSSSmmo"], [13, 6, "oHHhhHHHddsSSSSo"],
+      [14, 6, "oHHhHHHHoddssSo"], [15, 6, "oHHhHHHoddsso"], [16, 6, "oHhHHoodsso"], [17, 6, "oHHHoodssdo"],
+      // a slim dark suit: lapels, white shirt, black tie, pocket square
+      [18, 5, "ojJKKKWWsWo"], [19, 4, "ojJJKKKLWTWo"], [20, 4, "ojJJJKKLWTWo"], [21, 4, "ojJJJJKJLTWo"], [22, 4, "ojjJJJJWJLTo"],
+      [23, 4, "ojjJJJJJJJLo"], ...[24, 25, 26, 27].map(r => [r, 5, "ojjJJJJJJJo"]), ...[28, 29, 30, 31, 32, 33].map(r => [r, 5, "ojjJJJJJJo"]),
+      ...[34, 35, 36].map(r => [r, 5, "ojjJJJJJJJo"]), [37, 5, "ojjjJJJJJJo"],
       // the far leg, behind
-      ...[45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61].map(r => [r, 23, "onn"]),
-      [63, 21, "oBBB"], [64, 21, "oBBB"], [65, 21, "oBBB"],
-      // thighs, knees, shins, oxfords
-      [38, 4, "ojjjjjjjJJJJjoooooooooooooooo"], [39, 4, "ojjjjjjjjjjjNkkkkkkkkkkkkkkNo"],
-      [40, 4, "onnnnNNNNNNNNNNNNNNNNNNNNNNNNo"], [41, 4, "onnnNNNNNNNNNNNNNNNNNNNNNNNNNo"],
-      [42, 5, "onnnnnnNNNNNNNNNNNNNNNNNNNNo"], [43, 6, "onnnnnnnnnnnnnnnnnnnnNNNNo"], [44, 7, "ooooooooooooooooooonNNNo"],
-      [45, 25, "onNNNko"], [46, 25, "onNNNko"], ...[47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59].map(r => [r, 25, "onNNNNko"]),
-      [60, 25, "onnNNNNko"], [61, 25, "onnNNNNNko"],
-      [62, 25, "oBBBBBBBoo"], [63, 24, "oBBBBBBBBBgBoo"], [64, 24, "oBBBBBBBBBBBBBo"], [65, 24, "oBBBBBBBBBBBBBBo"], [66, 25, "oooooooooooooo"],
+      ...[43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60].map(r => [r, 25, "onn"]),
+      [63, 23, "oBBB"], [64, 23, "oBBB"], [65, 23, "oBBB"],
+      // long legs, slim trousers, oxfords
+      [38, 5, "ojjjJJJJJJoooooooooooooooo"], [39, 5, "ojjjjjjjjNkkkkkkkkkkkkkkkko"], [40, 5, "onnnnNNNNNNNNNNNNNNNNNNNNNo"],
+      [41, 6, "onnnnnnnnnnnnnnnnnnnnNNNNo"], [42, 7, "oooooooooooooooooooonNNNo"],
+      ...[43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60].map(r => [r, 27, "onNNko"]), [61, 27, "onNNNko"],
+      [62, 27, "oBBBBBoo"], [63, 26, "oBBBBBBgBoo"], [64, 26, "oBBBBBBBBBBo"], [65, 26, "oBBBBBBBBBBBo"], [66, 27, "ooooooooooo"],
       // the near arm: sleeve, shirt cuff, a hand on the cup's handle
-      [18, 9, "oKKJJo"], [19, 9, "oKKKJJjo"], [20, 10, "oKKJJJjo"], [21, 11, "oKKJJJjo"], [22, 12, "oKKJJJjo"],
-      [23, 13, "oKKJJJjo"], [24, 14, "oKKJJJjo"], [25, 15, "oKKJJJjoooooooooooSSo"], [26, 16, "oKJJJKKKKKKKKKKWWSSSo"],
-      [27, 17, "oJJJJJJJJJJJJJWWsSSo"], [28, 18, "ojjjjjjjjjjjjwwsso"]
+      [19, 8, "oKKJo"], [20, 9, "oKKJjo"], [21, 10, "oKKJjo"], [22, 11, "oKKJjo"], [23, 12, "oKKJjo"], [24, 13, "oKKJjo"],
+      [25, 14, "oKKJjoooooooooooooSSo"], [26, 15, "oKJJJKKKKKKKKKKKWWSSSo"], [27, 16, "oJJJJJJJJJJJJJJWWsSSo"], [28, 17, "ojjjjjjjjjjjjjwwsso"]
     ]
   },
   her: {
@@ -909,29 +905,26 @@ const SEATED = {
     },
     eye: [18, 10], skin: "S",
     rows: [
-      // glossy waves, a red rose behind her ear, cat-eye glasses, red lips, a pearl
-      [3, 10, "ooooo"], [4, 8, "oohhyyhoo"], [5, 7, "ohHhyYYyhho"], [6, 6, "oHHhhyYyhhhho"], [7, 6, "oHHHhhhyhhhhHo"],
-      [8, 5, "oHRRHHhhhhhHHSlo"], [9, 5, "orRRHHHdSSSSllllo"], [10, 5, "oHGHHHHdsSSSSelSSo"], [11, 5, "oHHHHHHPdsSSSllSSSo"],
-      [12, 5, "oHHHHHHHdsSSSSSSSSdo"], [13, 6, "oHHHHHHdsSSSSSSmMo"], [14, 6, "oHHHHHHHdsSSSSSSo"], [15, 6, "oHHHHHHHHddssSo"],
-      [16, 6, "oHHyHHHHHHsso"], [17, 6, "oHHyHHHHHHssSo"],
-      // bare shoulders, a strapless satin bodice, a small waist
-      [18, 5, "oHHHyHHHHsSSSSo"], [19, 5, "oHHHHyHHsSSSSSSo"], [20, 5, "ohHHHHHsSSSSSSSSo"], [21, 5, "ohhHHHdsSSSSSSSSo"],
-      [22, 6, "ohhHxDDDDXXDDDZo"], [23, 6, "ohxDDDDDXXXDDDZo"], [24, 6, "oxDDDDDDDXXDDZo"], [25, 6, "oxDDDDDDDDDDZo"],
-      [26, 6, "oxDDDDDDDDDZo"], [27, 6, "oxDDDDDDDDZo"], [28, 6, "oxDDDDDDDDZo"], [29, 5, "oxxDDDDDDDDZo"],
-      [30, 5, "oxxDDDDDDDDDZo"], [31, 4, "oxxDDXDDDDDDDZo"], [32, 4, "oxxDDXXDDDDDDDZo"],
-      [33, 3, "oxxxDDXXDDDDDDDZo"], [34, 3, "oxxxDDDXDDDDDDDZo"], [35, 3, "oxxxDDDDDDDDDDDZo"], [36, 3, "oxxxDDDDDDDDDDDZo"], [37, 3, "oxxxDDDDDDDDDDDZo"],
-      // the pencil dress over her thighs, past the knee, with a slit
-      [38, 3, "oxxxDDDDDDDDDDDZooooooooooooo"], [39, 3, "oxxxDDDDDDDDDDDXXXXXXXXXXXXXZo"], [40, 3, "oxxDDDDDDDDDDDDDDDDDDDDDDDDDZo"],
-      [41, 4, "oxxxDDDDDDDDDDDDDDDDDDDDDDZo"], [42, 5, "oxxxxxxxxxxxxxxxxxDDDDDDZo"], [43, 7, "oooooooooooooooxDDDDDZo"],
-      [44, 22, "oxDDDDZo"], [45, 22, "oxDDDDZo"], [46, 22, "oxDDDdSo"], [47, 22, "oxDDDdSo"], [48, 22, "oxDDdSSo"], [49, 22, "oxDDdSSo"],
-      [50, 22, "oxDXXdSo"], [51, 22, "ooooosSo"],
-      // slender legs, red stilettos with an ankle strap
-      [52, 23, "osSSSo"], [53, 23, "osSSSo"], [54, 23, "osSSSo"], [55, 24, "osSSo"], [56, 24, "osSSo"], [57, 24, "osSSo"],
-      [58, 24, "osSSo"], [59, 24, "osSSo"], [60, 24, "ofFFo"], [61, 23, "oFFFFFo"], [62, 23, "ofFFFFFFo"],
-      [63, 23, "ofo.oFFFFo"], [64, 23, "ofo..oFFFFo"], [65, 23, "ofo...ooooo"], [66, 23, "ooo"],
-      // the near arm: bare to above the elbow, then a black satin opera glove, her hand at her glass
-      [19, 12, "oSSso"], [20, 13, "oSSso"], [21, 14, "oSSso"], [22, 15, "oSSso"], [23, 16, "osVVo"], [24, 17, "oVvVVo"],
-      [25, 18, "oVvVVooooooooooooo"], [26, 19, "oVVvvvvvvvvvvvvvvVVo"], [27, 20, "oVVVVVVVVVVVVVVVVVo"], [28, 21, "ooooooooooooooooo"]
+      // glossy black waves past the shoulders, a red rose, cat-eye glasses, red lips, a pearl
+      [3, 10, "ooooo"], [4, 8, "oohhyyhoo"], [5, 7, "ohHhyYYyhho"], [6, 6, "oHHhhyYyyhhho"], [7, 5, "oHHHhhhhyhhhhHo"],
+      [8, 5, "oHRRHHhhhhhhHSlo"], [9, 5, "orRRHHHHdSSSllllo"], [10, 5, "oHGHHHHHdsSSSelSSo"], [11, 5, "oHHHHHHHPsSSSllSSSo"],
+      [12, 5, "oHHHHHHHHdsSSSSSSdo"], [13, 5, "oHHHHHHHHdsSSSSmMo"], [14, 5, "oHHHHHHHHHdsSSSSo"], [15, 5, "oHHHHHHHHHHddsSo"],
+      [16, 5, "oHHHyHHHHHHosso"], [17, 5, "oHHHHyHHHHHosSo"], [18, 5, "oHHHHHyHHHosSSo"],
+      // a long neck, bare shoulders, a strapless satin bodice, a tiny waist, slim hips
+      [19, 5, "oHHHHHHyHsSSSSo"], [20, 5, "ohHHHHHHsSSSSSSo"], [21, 5, "ohhHHHHdsSSSSSSo"], [22, 6, "ohhHHxDDXXDDZo"],
+      [23, 6, "ohhxDDDXXXDDZo"], [24, 6, "ohxDDDDDXXDZo"], [25, 7, "oxDDDDDDDDZo"], [26, 7, "oxDDDDDDDZo"], [27, 7, "oxDDDDDDZo"],
+      [28, 7, "oxDDDDDDZo"], [29, 7, "oxDDDDDDDZo"], [30, 6, "oxxDDDDDDDZo"], [31, 6, "oxxDDXDDDDDZo"], [32, 5, "oxxDDXXDDDDDZo"],
+      ...[33, 34, 35, 36, 37].map(r => [r, 5, "oxxxDDXDDDDDDZo"]),
+      // the pencil dress along slim thighs and past the knee, with a slit
+      [38, 5, "oxxxDDDDDDDDDZooooooooooooo"], [39, 5, "oxxxDDDDDDDDDXXXXXXXXXXXXZo"], [40, 5, "oxxDDDDDDDDDDDDDDDDDDDDDDZo"],
+      [41, 6, "oxxxxxxxxxxxxxxxxxxDDDDZo"], [42, 8, "ooooooooooooooooxDDDZo"],
+      [43, 24, "oxDDZo"], [44, 24, "oxDDZo"], [45, 24, "oxDdSo"], [46, 24, "oxDdSo"], [47, 24, "oxXdSo"], [48, 24, "ooodSo"],
+      // long legs, red stilettos with an ankle strap
+      [49, 24, "osSSo"], [50, 24, "osSSo"], [51, 24, "osSSo"], ...[52, 53, 54, 55, 56, 57, 58, 59].map(r => [r, 25, "osSo"]),
+      [60, 25, "ofFo"], [61, 24, "oFFFFo"], [62, 24, "ofFFFFFo"], [63, 24, "ofo.oFFFo"], [64, 24, "ofo..oFFFo"], [65, 24, "ofo...oooo"], [66, 24, "ooo"],
+      // a slim bare arm, then a black satin opera glove, her hand at her glass
+      [19, 11, "oSSo"], [20, 12, "oSSo"], [21, 13, "oSSo"], [22, 14, "oSso"], [23, 15, "osVo"], [24, 16, "oVvVo"],
+      [25, 17, "oVvVoooooooooooooo"], [26, 18, "oVVvvvvvvvvvvvvvvVVo"], [27, 19, "oVVVVVVVVVVVVVVVVVo"], [28, 20, "oooooooooooooooooo"]
     ]
   }
 };
