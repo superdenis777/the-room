@@ -609,13 +609,16 @@ function catShown(sec, t) {
 const ME = LINK.get("me") === "a" ? 0 : 1;
 const FEET = 135, SEAT = 24, WALK = 20, SIT_T = 1.3; // floor line; seat height; px per second; seconds to sit or stand
 const LOOKS = [
-  { // left: white short-sleeved shirt, Japanese indigo denim, white sneakers with three black stripes, wild golden-brown hair
+  { // left, old Hollywood: a charcoal suit, white shirt, slim black tie, pocket square, polished black shoes,
+    // golden-brown hair swept back into a tousled quiff
     k: 1, heel: 1, R: 5.1, skin: [214, 160, 124], hair: [128, 82, 40], hairHi: [222, 176, 98],
-    top: [240, 238, 230], legs: [40, 58, 98], legsHi: [74, 98, 146], cuff: [104, 128, 176], shoe: [242, 240, 234], mark: [24, 24, 28]
+    suit: [44, 46, 58], suitHi: [92, 96, 116], shirt: [238, 236, 228], tie: [14, 14, 18], shoe: [26, 24, 26], shine: [128, 124, 130]
   },
-  { // right: black hair, glasses, a black satin night dress, burgundy heels
-    k: 0.9, heel: 2.6, R: 5.1, skin: [218, 168, 132], hair: [20, 16, 22], hairHi: [96, 86, 110],
-    top: [26, 20, 30], topHi: [132, 112, 146], shoe: [150, 22, 50], mark: [64, 8, 22], lips: [164, 62, 74], glass: [12, 10, 14]
+  { // right, old Hollywood: glossy black waves, cat-eye glasses, red lips, a black satin evening dress with bare
+    // shoulders and a slit, black satin opera gloves, a pearl, red stilettos
+    k: 0.9, heel: 2.6, R: 5.1, skin: [218, 168, 132], hair: [20, 16, 22], hairHi: [104, 96, 122],
+    dress: [24, 18, 28], dressHi: [146, 124, 162], glove: [18, 14, 22], gloveHi: [112, 98, 128],
+    shoe: [188, 24, 42], shoeDark: [108, 10, 24], lips: [186, 30, 48], glass: [12, 10, 14], pearl: [240, 236, 226]
   }
 ];
 const GUESTS = [0, 1].map(side => {
@@ -685,70 +688,100 @@ function guestShapes(g, J) {
   const L = g.look, k = L.k, her = g.side === 1, R = L.R, S = [];
   const cap = (a, b, r, part, o) => S.push({ hit: hitCapsule, g: [a[0], a[1], b[0], b[1], r], part, ...o });
   const ell = (c, rx, ry, part, o) => S.push({ hit: hitEllipse, g: [c[0], c[1], rx, ry, 0], part, ...o });
-  const add = (a, b) => [a[0] + b[0], a[1] + b[1]];
+  const add = (a, b) => [a[0] + b[0], a[1] + b[1]], mid = (a, b, w) => [lerp(a[0], b[0], w), lerp(a[1], b[1], w)];
   const foot = (an, dim) => {
-    if (her) { cap(an, add(an, [5.6 * k, L.heel + 0.2]), 1.1, "shoe", { dim }); cap(add(an, [-1.2, 0.6]), add(an, [-1.3, L.heel + 0.3]), 0.55, "heel", { dim }); }
-    else cap(add(an, [-1.5, 0.2]), add(an, [7, 0.2]), 1.6, "shoe", { dim });
+    if (her) { // a stiletto: the arched foot, the spike under the heel
+      cap(an, add(an, [5.6 * k, L.heel + 0.2]), 1.1, "shoe", { dim });
+      cap(add(an, [-1.2, 0.6]), add(an, [-1.3, L.heel + 0.3]), 0.5, "heel", { dim });
+    } else cap(add(an, [-1.4, 0.3]), add(an, [6.4, 0.3]), 1.45, "shoe", { dim }); // an oxford
   };
-  // far side first, dimmer: arm, leg, foot
-  cap(J.sh, J.el2, 1.6 * k, "arm", { dim: 0.7 }); cap(J.el2, J.ha2, 1.4 * k, "skin", { dim: 0.7 });
-  cap(J.hip, J.kn2, (her ? 1.9 : 2.7) * k, "leg", { dim: 0.74 }); cap(J.kn2, J.an2, (her ? 1.4 : 2.4) * k, "shin", { dim: 0.74 }); foot(J.an2, 0.74);
-  // hair that falls behind
-  if (her) { cap(add(J.head, [-1.6 * k, -0.5]), add(J.sh, [-2.4 * k, 4.5 * k]), R * 0.86, "hair"); ell(add(J.head, [-0.6, -0.9]), R + 0.9, R + 0.7, "hair"); }
-  else S.push({ hit: hitMop, g: [J.head[0] - 1.9, J.head[1] - 2.1, R + 1.5, R + 1.1, 1.3], part: "hair" });
+  const arm = (sh, el, ha, dim) => {
+    if (her) { cap(sh, el, 1.35 * k, "upper", { dim }); cap(el, ha, 1.25 * k, "glove", { dim }); ell(ha, 1.3 * k, 1.2 * k, "glove", { dim }); }
+    else { cap(sh, el, 1.8, "suit", { dim }); cap(el, ha, 1.6, "sleeve", { dim }); ell(ha, 1.35, 1.25, "skin", { dim }); }
+  };
+  const leg = (kn, an, dim) => {
+    if (her) { cap(J.hip, kn, 1.9 * k, "skin", { dim }); cap(kn, an, 1.4 * k, "skin", { dim }); }
+    else { cap(J.hip, kn, 2.6, "trouser", { dim }); cap(kn, an, 2.3, "trouser", { dim }); }
+    foot(an, dim);
+  };
+  // far side first, dimmer
+  arm(J.sh, J.el2, J.ha2, 0.7);
+  leg(J.kn2, J.an2, 0.74);
+  // hair behind the head
+  if (her) { // glossy waves, full around the head and falling to the shoulders
+    ell(add(J.head, [-1.1, 0]), R + 1.3, R + 1.2, "hair");
+    cap(add(J.head, [-2.2, 1.2]), add(J.sh, [-2.4 * k, 2.6 * k]), R * 0.82, "hair");
+  }
+  else S.push({ hit: hitMop, g: [J.head[0] - 1.7, J.head[1] - 1.8, R + 1.1, R + 0.7, 1.3], part: "hair" });
   // torso
   if (her) {
-    ell(add(J.hip, [0.2 * k, -1.8 * k]), 4.7 * k, 4.3 * k, "torso");
-    cap(add(J.hip, [0, -3 * k]), add(J.sh, [0.4 * k, 8 * k]), 3.2 * k, "torso");
-    ell(add(J.sh, [1 * k, 5.2 * k]), 4.5 * k, 5.4 * k, "torso");
+    ell(add(J.hip, [0.2 * k, -1.8 * k]), 4.7 * k, 4.3 * k, "dress");
+    cap(add(J.hip, [0, -3 * k]), add(J.sh, [0.4 * k, 8 * k]), 3.1 * k, "dress");
+    ell(add(J.sh, [1.1 * k, 5.2 * k]), 4.6 * k, 5.4 * k, "bodice");
   } else {
-    ell(add(J.hip, [-0.4, -1.2]), 4.1, 2.8, "leg");                 // the seat of his jeans
-    cap(add(J.hip, [0, -1.6]), add(J.sh, [0.2, 9]), 3.7, "torso");  // waist
-    ell(add(J.sh, [0.7, 5.6]), 4.5, 6.4, "torso");                  // chest and shoulders
+    ell(add(J.hip, [-0.4, -1.2]), 4.1, 2.8, "trouser");
+    cap(add(J.hip, [0, 0.8]), add(J.sh, [0.2, 9]), 3.9, "suit");     // the jacket, down over the hips
+    ell(add(J.sh, [0.7, 5.6]), 4.6, 6.5, "jacket");                  // chest: lapels, shirt front, tie, pocket square
+    ell(add(J.sh, [0, 1.2]), 3.2, 2.2, "suit");                      // a padded shoulder
   }
-  // near leg and foot; her dress falls over the thighs
-  cap(J.hip, J.kn1, (her ? 1.9 : 2.7) * k, "leg"); cap(J.kn1, J.an1, (her ? 1.4 : 2.4) * k, "shin"); foot(J.an1, 1);
-  if (her) cap(add(J.hip, [0, -1]), [lerp(J.hip[0], (J.kn1[0] + J.kn2[0]) / 2, 0.86), lerp(J.hip[1], (J.kn1[1] + J.kn2[1]) / 2, 0.86)], 3.5 * k, "skirt");
-  // neck, head, the hair over it, and the near arm
-  cap(J.sh, J.neck, 1.5 * k, "skin");
+  // near leg; her pencil dress over the thighs and down past the knee, with a slit
+  leg(J.kn1, J.an1, 1);
+  if (her) {
+    const kn = mid(J.kn1, J.kn2, 0.5), hem = mid(kn, mid(J.an1, J.an2, 0.5), 0.45);
+    cap(add(J.hip, [0, -1]), kn, 3.5 * k, "dress");
+    cap(kn, hem, 2.5 * k, "skirt");
+  }
+  // neck (his with a collar), head, the hair over it, the near arm
+  cap(J.sh, J.neck, 1.5 * k, her ? "skin" : "collar");
   ell(J.head, R, R, "skin");
   ell(add(J.head, [R * 0.38, R * 0.52]), R * 0.62, R * 0.5, "skin");                            // jaw and chin
   cap(add(J.head, [R * 0.8, -R * 0.12]), add(J.head, [R * 1.14, R * 0.2]), 0.65 * k, "skin");  // nose
-  if (her) ell(add(J.head, [1.3 * k, -R * 0.68]), R * 0.8, R * 0.36, "hair"); // a straight fringe
-  else { // wild, messy fringe falling forward over the brow, and a few strands that won't lie down
-    for (const [ax, ay, bx, by, r] of [[-0.5, -R - 0.4, 2.6, -R * 0.62, 1.5], [1.2, -R - 0.2, 4.6, -R * 0.42, 1.1], [2.4, -R + 0.3, 5.4, -R * 0.62, 0.8],
-      [-1.5, -R - 1.2, -2.8, -R - 3.4, 0.9], [0.8, -R - 1, 1.6, -R - 3.2, 0.8], [-4.6, -R + 0.2, -7.2, -R - 1.2, 0.9], [-R - 0.4, -0.4, -R - 1.4, 2.4, 1]])
+  if (her) { // a deep side part, the wave sweeping across the brow
+    ell(add(J.head, [0.9 * k, -R * 0.74]), R * 0.92, R * 0.4, "hair");
+    cap(add(J.head, [R * 0.3, -R * 0.95]), add(J.head, [R * 1.02, -R * 0.42]), 1.0, "hair");
+  } else { // swept back into a quiff, with a strand that won't stay put
+    ell(add(J.head, [0.9, -R * 0.92]), R * 0.88, R * 0.52, "hair");
+    for (const [ax, ay, bx, by, r] of [[2.4, -R - 0.6, 4.2, -R - 1.4, 0.9], [-1, -R - 1.1, -3.4, -R - 1.8, 0.8], [2.2, -R * 0.75, 3.6, -R * 0.2, 0.55]])
       cap(add(J.head, [ax, ay]), add(J.head, [bx, by]), r, "hair");
   }
-  cap(J.sh, J.el1, 1.6 * k, "arm"); cap(J.el1, J.ha1, 1.4 * k, "skin"); ell(J.ha1, 1.4 * k, 1.3 * k, "skin");
+  arm(J.sh, J.el1, J.ha1, 1);
   return S;
 }
 
-const STRIPES = [[0.3, 0.39], [0.46, 0.55], [0.62, 0.71]];
 const mixC = (a, b, w) => a.map((v, i) => lerp(v, b[i], w));
 function guestColor(g, J, s, h, lx, ly) {
-  const L = g.look, her = g.side === 1;
-  const satin = () => mixC(L.top, L.topHi, clamp01((h.nz - 0.55) * 2.4) * clamp01(0.4 - h.ny));
+  const L = g.look;
+  const sheen = (base, hi) => mixC(base, hi, clamp01((h.nz - 0.55) * 2.4) * clamp01(0.4 - h.ny)); // satin catches the light
+  const cloth = () => mixC(L.suit, L.suitHi, h.nz > 0.82 ? 0.3 : 0.1 * grain(Math.floor(lx), Math.floor(ly)));
   switch (s.part) {
     case "skin": return L.skin;
-    case "arm": return her || h.u >= 0.56 ? L.skin : h.u > 0.47 ? mixC(L.top, [150, 146, 140], 0.35) : L.top; // short sleeves, a hem
-    case "leg": case "shin":
-      if (her) return L.skin;
-      if (s.part === "shin" && h.u > 0.84) return h.u > 0.92 ? L.cuff : mixC(L.cuff, [236, 232, 220], 0.35); // the turned-up selvedge cuff
-      return mixC(L.legs, L.legsHi, h.nz > 0.75 ? 0.4 : 0.12 * grain(Math.floor(lx), Math.floor(ly)));
+    // his suit
+    case "suit": case "trouser": return cloth();
+    case "sleeve": return h.u > 0.86 ? L.shirt : cloth(); // a shirt cuff showing at the wrist
+    case "collar": return h.u < 0.5 ? L.shirt : L.skin;
+    case "jacket": {
+      const fx = lx - J.sh[0], fy = ly - J.sh[1];                                              // from the shoulder
+      if (Math.abs(fx - 2.6) < 0.8 && Math.abs(fy - 5.4) < 0.7) return L.shirt;                // pocket square
+      if (fx > 4.3 && fy > 0.5 && fy < 10) return L.tie;                                       // a slim tie down the front
+      if (fx > 2.6 && fy < 1.5 + (fx - 2.6) * 2.4) return L.shirt;                             // the shirt in the V of the lapels
+      if (fx > 1.9 && fy < 2.6 + (fx - 1.9) * 2.4) return mixC(L.suit, [8, 8, 12], 0.55);    // lapel edge
+      return cloth();
+    }
     case "shoe":
-      if (her) return h.v > 0.45 ? L.mark : L.shoe;
-      return Math.abs(h.v) < 0.7 && STRIPES.some(([a, b]) => h.u >= a && h.u <= b) ? L.mark : L.shoe;
-    case "heel": return L.mark;
-    case "torso":
-      if (her) return ly < J.sh[1] + 2.6 ? (Math.abs(lx - J.sh[0] - 0.6) < 0.7 ? L.top : L.skin) : satin(); // bare shoulders, thin straps
-      if (ly < J.sh[1] + 2.4 && lx > J.sh[0] + 1.4) return L.skin;                                   // open collar
-      return mixC(L.top, [196, 194, 188], 0.3 * grain(Math.floor(lx * 0.7), Math.floor(ly * 0.5)));   // a little crumpled
-    case "skirt": return satin();
+      if (g.side) return h.u < 0.16 ? L.shoeDark : L.shoe; // an ankle strap
+      return h.nz > 0.8 && h.ny < -0.2 ? L.shine : L.shoe;
+    case "heel": return L.shoeDark;
+    // her dress and gloves
+    case "bodice": if (ly < J.sh[1] + 2.4) return L.skin; // strapless: bare shoulders
+    // falls through
+    case "dress": return sheen(L.dress, L.dressHi);
+    case "skirt": return h.v > 0.35 && h.u > 0.3 ? L.skin : sheen(L.dress, L.dressHi); // the slit
+    case "upper": return h.u > 0.72 ? sheen(L.glove, L.gloveHi) : L.skin;          // gloves to above the elbow
+    case "glove": return sheen(L.glove, L.gloveHi);
     case "hair": {
+      if (g.side) return mixC(L.hair, L.hairHi, Math.sin(ly * 1.25 + lx * 0.45) > 0.6 && h.nz > 0.4 ? 0.55 : 0); // glossy waves
       const n = hash(77, Math.floor(lx * 1.4), Math.floor(ly * 1.4));
-      if (her) return mixC(L.hair, L.hairHi, h.nz > 0.7 && h.ny < -0.2 ? 0.5 : 0);
-      const streak = Math.sin(lx * 1.7 - ly * 0.9 + 4 * hash(5, Math.floor(lx * 0.5))) > 0.45;    // sun streaks
+      const streak = Math.sin(lx * 1.7 - ly * 0.9 + 4 * hash(5, Math.floor(lx * 0.5))) > 0.45;                 // sun streaks
       return mixC(L.hair, L.hairHi, streak ? 0.75 : 0.25 * n);
     }
   }
@@ -783,9 +816,11 @@ function drawGuest(d, g, t) {
   px(hx + R * 0.66, hy - 1.6 - up, g.side ? L.hair : mixC(L.hair, [40, 26, 14], 0.5));
   px(hx - R * 0.12, hy + 0.4, mixC(L.skin, [120, 70, 50], 0.35));                         // ear
   px(hx + R * 0.86, hy + 2.3 - up * 0.5, g.side ? L.lips : [168, 104, 90]);              // mouth
-  if (g.side) {
+  if (g.side) { // cat-eye glasses and a pearl
     for (let i = -0.4; i <= R * 0.95; i += 0.9) px(hx + i, hy - 1.2 - up, L.glass);    // temple and the top of the frame
     px(hx + R * 0.95, hy - 0.4 - up, L.glass); px(hx + R * 0.95, hy + 0.5 - up, L.glass); // the lens edge
+    px(hx + R * 1.05, hy - 2.1 - up, L.glass, true);                                     // the upswept corner
+    px(hx - R * 0.1, hy + 1.7, L.pearl, true);
   }
   // outline, like the cat's: dark against light, a faint pale rim against the dark
   for (let y = y0 - 1; y <= y1 + 1; y++) for (let x = x0 - 1; x <= x1 + 1; x++) {
