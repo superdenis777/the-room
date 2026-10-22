@@ -610,8 +610,8 @@ const ME = LINK.get("me") === "a" ? 0 : 1;
 const FEET = 135, SEAT = 24, WALK = 20, SIT_T = 1.3; // floor line; seat height; px per second; seconds to sit or stand
 const LOOKS = [
   { // left: white short-sleeved shirt, Japanese indigo denim, white sneakers with three black stripes, wild golden-brown hair
-    k: 1, heel: 1, R: 5.6, skin: [228, 186, 152], hair: [142, 94, 46], hairHi: [210, 162, 88],
-    top: [238, 236, 228], legs: [44, 64, 106], legsHi: [78, 102, 150], shoe: [242, 240, 234], mark: [24, 24, 28]
+    k: 1, heel: 1, R: 5.1, skin: [214, 160, 124], hair: [128, 82, 40], hairHi: [222, 176, 98],
+    top: [240, 238, 230], legs: [40, 58, 98], legsHi: [74, 98, 146], cuff: [104, 128, 176], shoe: [242, 240, 234], mark: [24, 24, 28]
   },
   { // right: black hair, glasses, a black satin night dress, burgundy heels
     k: 0.9, heel: 2.6, R: 5.1, skin: [218, 168, 132], hair: [20, 16, 22], hairHi: [96, 86, 110],
@@ -674,6 +674,13 @@ function guestJoints(g, t) {
   return J;
 }
 
+function hitMop([cx, cy, rx, ry, seed], x, y) { // an ellipse with a wild, wandering edge
+  const u = (x - cx) / rx, v = (y - cy) / ry, a = Math.atan2(v, u), r2 = u * u + v * v;
+  const edge = 1 + 0.16 * Math.sin(7 * a + seed) + 0.1 * Math.sin(13 * a + 2 * seed) + 0.07 * Math.sin(23 * a);
+  if (r2 > edge * edge) return null;
+  const r = Math.sqrt(r2) / edge;
+  return { u: a, v: r, cu: x, cv: y, nx: u / edge, ny: v / edge, nz: Math.sqrt(Math.max(0, 1 - r * r)) };
+}
 function guestShapes(g, J) {
   const L = g.look, k = L.k, her = g.side === 1, R = L.R, S = [];
   const cap = (a, b, r, part, o) => S.push({ hit: hitCapsule, g: [a[0], a[1], b[0], b[1], r], part, ...o });
@@ -688,24 +695,30 @@ function guestShapes(g, J) {
   cap(J.hip, J.kn2, (her ? 1.9 : 2.7) * k, "leg", { dim: 0.74 }); cap(J.kn2, J.an2, (her ? 1.4 : 2.4) * k, "shin", { dim: 0.74 }); foot(J.an2, 0.74);
   // hair that falls behind
   if (her) { cap(add(J.head, [-1.6 * k, -0.5]), add(J.sh, [-2.4 * k, 4.5 * k]), R * 0.86, "hair"); ell(add(J.head, [-0.6, -0.9]), R + 0.9, R + 0.7, "hair"); }
-  else ell(add(J.head, [-1.1, -1.4]), R + 1.4, R + 0.9, "hair");
+  else S.push({ hit: hitMop, g: [J.head[0] - 1.9, J.head[1] - 2.1, R + 1.5, R + 1.1, 1.3], part: "hair" });
   // torso
   if (her) {
     ell(add(J.hip, [0.2 * k, -1.8 * k]), 4.7 * k, 4.3 * k, "torso");
     cap(add(J.hip, [0, -3 * k]), add(J.sh, [0.4 * k, 8 * k]), 3.2 * k, "torso");
     ell(add(J.sh, [1 * k, 5.2 * k]), 4.5 * k, 5.4 * k, "torso");
-  } else cap(add(J.hip, [0.3, 1.6]), J.sh, 5.4 * k, "torso");
+  } else {
+    ell(add(J.hip, [-0.4, -1.2]), 4.1, 2.8, "leg");                 // the seat of his jeans
+    cap(add(J.hip, [0, -1.6]), add(J.sh, [0.2, 9]), 3.7, "torso");  // waist
+    ell(add(J.sh, [0.7, 5.6]), 4.5, 6.4, "torso");                  // chest and shoulders
+  }
   // near leg and foot; her dress falls over the thighs
   cap(J.hip, J.kn1, (her ? 1.9 : 2.7) * k, "leg"); cap(J.kn1, J.an1, (her ? 1.4 : 2.4) * k, "shin"); foot(J.an1, 1);
   if (her) cap(add(J.hip, [0, -1]), [lerp(J.hip[0], (J.kn1[0] + J.kn2[0]) / 2, 0.86), lerp(J.hip[1], (J.kn1[1] + J.kn2[1]) / 2, 0.86)], 3.5 * k, "skirt");
   // neck, head, the hair over it, and the near arm
   cap(J.sh, J.neck, 1.5 * k, "skin");
   ell(J.head, R, R, "skin");
+  ell(add(J.head, [R * 0.38, R * 0.52]), R * 0.62, R * 0.5, "skin");                            // jaw and chin
+  cap(add(J.head, [R * 0.8, -R * 0.12]), add(J.head, [R * 1.14, R * 0.2]), 0.65 * k, "skin");  // nose
   if (her) ell(add(J.head, [1.3 * k, -R * 0.68]), R * 0.8, R * 0.36, "hair"); // a straight fringe
-  else {
-    ell(add(J.head, [1.2, -R * 0.7]), R * 0.82, R * 0.42, "hair");
-    for (const [ax, ay, bx, by] of [[-2, -R, -4, -R - 2.6], [0.5, -R - 0.3, 0.2, -R - 2.9], [2.6, -R + 0.4, 4.4, -R - 1.4], [-4.2, -R + 1.6, -6.6, -R + 0.4], [-5, -1, -7.4, 0.6]])
-      cap(add(J.head, [ax, ay]), add(J.head, [bx, by]), 1.1, "hair"); // wild, messy tufts
+  else { // wild, messy fringe falling forward over the brow, and a few strands that won't lie down
+    for (const [ax, ay, bx, by, r] of [[-0.5, -R - 0.4, 2.6, -R * 0.62, 1.5], [1.2, -R - 0.2, 4.6, -R * 0.42, 1.1], [2.4, -R + 0.3, 5.4, -R * 0.62, 0.8],
+      [-1.5, -R - 1.2, -2.8, -R - 3.4, 0.9], [0.8, -R - 1, 1.6, -R - 3.2, 0.8], [-4.6, -R + 0.2, -7.2, -R - 1.2, 0.9], [-R - 0.4, -0.4, -R - 1.4, 2.4, 1]])
+      cap(add(J.head, [ax, ay]), add(J.head, [bx, by]), r, "hair");
   }
   cap(J.sh, J.el1, 1.6 * k, "arm"); cap(J.el1, J.ha1, 1.4 * k, "skin"); ell(J.ha1, 1.4 * k, 1.3 * k, "skin");
   return S;
@@ -718,19 +731,25 @@ function guestColor(g, J, s, h, lx, ly) {
   const satin = () => mixC(L.top, L.topHi, clamp01((h.nz - 0.55) * 2.4) * clamp01(0.4 - h.ny));
   switch (s.part) {
     case "skin": return L.skin;
-    case "arm": return !her && h.u < 0.55 ? L.top : L.skin; // short sleeves
-    case "leg": case "shin": return her ? L.skin : mixC(L.legs, L.legsHi, h.nz > 0.75 ? 0.45 : 0.12 * grain(Math.floor(lx), Math.floor(ly)));
+    case "arm": return her || h.u >= 0.56 ? L.skin : h.u > 0.47 ? mixC(L.top, [150, 146, 140], 0.35) : L.top; // short sleeves, a hem
+    case "leg": case "shin":
+      if (her) return L.skin;
+      if (s.part === "shin" && h.u > 0.84) return h.u > 0.92 ? L.cuff : mixC(L.cuff, [236, 232, 220], 0.35); // the turned-up selvedge cuff
+      return mixC(L.legs, L.legsHi, h.nz > 0.75 ? 0.4 : 0.12 * grain(Math.floor(lx), Math.floor(ly)));
     case "shoe":
       if (her) return h.v > 0.45 ? L.mark : L.shoe;
       return Math.abs(h.v) < 0.7 && STRIPES.some(([a, b]) => h.u >= a && h.u <= b) ? L.mark : L.shoe;
     case "heel": return L.mark;
     case "torso":
       if (her) return ly < J.sh[1] + 2.6 ? (Math.abs(lx - J.sh[0] - 0.6) < 0.7 ? L.top : L.skin) : satin(); // bare shoulders, thin straps
-      return mixC(L.top, [200, 198, 192], 0.25 * grain(Math.floor(lx * 0.7), Math.floor(ly * 0.5))); // a little crumpled
+      if (ly < J.sh[1] + 2.4 && lx > J.sh[0] + 1.4) return L.skin;                                   // open collar
+      return mixC(L.top, [196, 194, 188], 0.3 * grain(Math.floor(lx * 0.7), Math.floor(ly * 0.5)));   // a little crumpled
     case "skirt": return satin();
     case "hair": {
       const n = hash(77, Math.floor(lx * 1.4), Math.floor(ly * 1.4));
-      return her ? mixC(L.hair, L.hairHi, h.nz > 0.7 && h.ny < -0.2 ? 0.5 : 0) : mixC(L.hair, L.hairHi, n > 0.72 ? 0.7 : 0.15 * n);
+      if (her) return mixC(L.hair, L.hairHi, h.nz > 0.7 && h.ny < -0.2 ? 0.5 : 0);
+      const streak = Math.sin(lx * 1.7 - ly * 0.9 + 4 * hash(5, Math.floor(lx * 0.5))) > 0.45;    // sun streaks
+      return mixC(L.hair, L.hairHi, streak ? 0.75 : 0.25 * n);
     }
   }
   return L.skin;
@@ -759,9 +778,11 @@ function drawGuest(d, g, t) {
     for (let k = 0; k < 3; k++) d[j * 4 + k] = q(c[k] * light[j * 3 + k] * 0.95, x, y);
     guestMask[j] = g.side + 1;
   };
-  px(hx + R * 0.52, hy - 0.4 - up, [34, 24, 22]);
-  px(hx + R + 0.4, hy + 0.8 - up * 0.6, L.skin, true);
-  px(hx + R * 0.74, hy + 2.6 - up * 0.5, g.side ? L.lips : [176, 116, 100]);
+  px(hx + R * 0.55, hy - 0.5 - up, [30, 22, 20]);                                          // eye
+  px(hx + R * 0.4, hy - 1.6 - up, g.side ? L.hair : mixC(L.hair, [40, 26, 14], 0.5));      // brow
+  px(hx + R * 0.66, hy - 1.6 - up, g.side ? L.hair : mixC(L.hair, [40, 26, 14], 0.5));
+  px(hx - R * 0.12, hy + 0.4, mixC(L.skin, [120, 70, 50], 0.35));                         // ear
+  px(hx + R * 0.86, hy + 2.3 - up * 0.5, g.side ? L.lips : [168, 104, 90]);              // mouth
   if (g.side) {
     for (let i = -0.4; i <= R * 0.95; i += 0.9) px(hx + i, hy - 1.2 - up, L.glass);    // temple and the top of the frame
     px(hx + R * 0.95, hy - 0.4 - up, L.glass); px(hx + R * 0.95, hy + 0.5 - up, L.glass); // the lens edge
@@ -776,9 +797,10 @@ function drawGuest(d, g, t) {
 }
 
 // ---------------------------------------------------------------- presence
-// Each open page checks in every 15 s with a hash of the link (never the places themselves) and
-// learns whether the other side is here. Without a real link, or with the server unreachable,
-// the room simply shows you alone.
+// Each open page checks in every 20 s with a hash of the link (never the places themselves) and
+// learns whether the other side is here. A page left open in the background stays at the table;
+// only closing it is leaving. Without a real link, or with the server unreachable, the room
+// simply shows you alone.
 const LOCAL = location.protocol === "file:" || ["localhost", "127.0.0.1"].includes(location.hostname);
 const PRESENCE = (LOCAL && new URLSearchParams(location.search).get("presence")) || "https://hotel-dada-presence.popadenisro.workers.dev";
 const ROOM_ID = LINK.has("a") && LINK.has("b") ? roomId(LINK.get("a") + "|" + LINK.get("b")) : null;
@@ -795,7 +817,7 @@ async function checkIn() {
     const here = await r.json();
     setPresent(GUESTS[1 - ME], !!here[ME ? "a" : "b"], performance.now() / 1000, firstAnswer);
     firstAnswer = false;
-  } catch { /* the room works without it */ }
+  } catch (err) { console.warn("presence unreachable:", err.message); } // the room works without it
 }
 function leave() {
   if (ROOM_ID) navigator.sendBeacon(PRESENCE, JSON.stringify({ room: ROOM_ID, side: MY_SIDE, leave: true }));
@@ -954,9 +976,9 @@ bMusic.onclick = () => {
 };
 setPresent(GUESTS[ME], true, performance.now() / 1000); // you walk in
 checkIn();
-setInterval(() => { if (!document.hidden) checkIn(); }, 15000);
+setInterval(checkIn, 20000);
 addEventListener("pagehide", leave);
-document.addEventListener("visibilitychange", () => document.hidden ? leave() : checkIn());
+document.addEventListener("visibilitychange", () => { if (!document.hidden) checkIn(); });
 requestAnimationFrame(frame);
 </script>
 </body>
