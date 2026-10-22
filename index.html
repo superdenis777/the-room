@@ -221,6 +221,11 @@ for (let x = 40; x <= 216; x++) {
   for (let y = SILL_Y + 2; y <= SILL_Y + 4; y++) put(x, y, [92, 62, 40]);
   for (let y = SILL_Y + 5; y <= SILL_Y + 6; y++) { const j = (y * W + x) * 3; albedo[j] *= 0.55; albedo[j + 1] *= 0.55; albedo[j + 2] *= 0.55; }
 }
+// The kitty bed: a low round cushion on the sill, right on the seam, so the cat sleeps in both times.
+for (let x = 116; x <= 140; x++) {
+  const e = Math.abs(x - 128), rim = e > 12 ? 0 : e > 8 ? 4 - (e > 11) : 2;
+  for (let y = SILL_Y - rim; y < SILL_Y; y++) put(x, y, y === SILL_Y - rim ? [200, 128, 116] : (x * 3 + y) % 5 ? [156, 88, 84] : [134, 74, 72]);
+}
 // The stairs, seen from the side, from the floor up to the sill.
 const STEPS = 7, stepTop = x => Math.round(FLOOR_Y - (Math.min(STEPS - 1, Math.max(0, Math.floor((x - 6) / (36 / STEPS)))) + 1) * (FLOOR_Y - SILL_Y) / STEPS);
 for (let x = 6; x <= 44; x++) {
@@ -376,15 +381,15 @@ function loafPose() {
 const mix = (a, b, w) => typeof a === "number" ? lerp(a, b, w) : a.map((v, i) => mix(v, b[i], w));
 const blend = (a, b, w) => Object.fromEntries(Object.keys(a).map(k => [k, mix(a[k], b[k], w)]));
 
-// Where a cat can go, as one line folded through the room: along the sill (right to left),
-// down the stairs, then along the floor behind the table. Positions are distances along it.
-const PATH = [[214, SILL_Y], [37, SILL_Y], [1, FLOOR_Y], [186, FLOOR_Y]]; // the stairs leg runs along the step edges
+// Where the cat can go: for now only along the sill, right to left, across the seam and back.
+// Positions are distances along it.
+const PATH = [[212, SILL_Y], [44, SILL_Y]];
 const SEGS = [];
 for (let i = 1, s = 0; i < PATH.length; i++) {
   const [ax, ay] = PATH[i - 1], [bx, by] = PATH[i], len = Math.hypot(bx - ax, by - ay);
   SEGS.push({ ax, ay, dx: (bx - ax) / len, dy: (by - ay) / len, s0: s, len }); s += len;
 }
-const TOTAL = SEGS.at(-1).s0 + SEGS.at(-1).len, SILL_END = SEGS[0].len, STAIRS_END = SEGS[1].s0 + SEGS[1].len;
+const TOTAL = SEGS.at(-1).s0 + SEGS.at(-1).len, sAt = x => 212 - x, BED = sAt(128);
 function along(s) {
   s = Math.max(0, Math.min(TOTAL, s));
   const g = SEGS.find(g => s <= g.s0 + g.len) || SEGS.at(-1), u = s - g.s0;
@@ -398,14 +403,10 @@ function tiltAt(s, dir) { // lean into the slope (a little less than the stairs)
 }
 
 // The cat's day, planned in 10-minute spans. Each span is computed fresh from (seed, span index):
-// it starts where the last one ends, wanders between spots, and rests; sometimes it goes up to the sill.
+// it starts where the last one ends. Mostly it snoozes in its bed; now and then it strolls along
+// the sill to sit and watch one of the skies.
 const SPAN = 600, STRIDE = 7, SPEED = 2.4 + 1.4 * CAT.mind.impulsive; // px per second: slow
-function spot(r) {
-  const m = CAT.mind;
-  if (r() < 0.15 + 0.3 * m.skittish) return 8 + r() * (SILL_END - 16);                 // skittish cats like it high
-  if (r() < m.dominance * 0.5) return STAIRS_END + 122 + (r() - 0.5) * 40;             // dominant ones keep near the table
-  return STAIRS_END + 8 + r() * (TOTAL - STAIRS_END - 12);
-}
+const spot = r => r() < 0.6 ? BED : 6 + r() * (TOTAL - 12);
 const spanStart = k => spot(mulberry(Math.floor(hash(SEED, k, 1) * 4294967296)));
 let cached = { k: NaN, ev: null };
 function plan(k) {
@@ -413,7 +414,7 @@ function plan(k) {
   const r = mulberry(Math.floor(hash(SEED, k, 2) * 4294967296)), m = CAT.mind;
   const ev = [], end = spanStart(k + 1);
   let s = spanStart(k), t = 0, dist = 0, way = hash(SEED, k, 3) < 0.5 ? -1 : 1;
-  const rest = (pose, dur, sill = false) => { ev.push({ pose, sill, t0: t, t1: t + dur, s0: s, s1: s, d0: dist, way }); t += dur; };
+  const rest = (pose, dur, sill = false, bed = false) => { ev.push({ pose, sill, bed, t0: t, t1: t + dur, s0: s, s1: s, d0: dist, way }); t += dur; };
   const walk = to => {
     if (Math.abs(to - s) < 1) return;
     if (Math.sign(to - s) !== way) { way = -way; rest("stand", 1 + r() * 1.5); } // turning around: a short look back
@@ -426,17 +427,11 @@ function plan(k) {
     for (let i = 0; i < 3 && Math.abs(to - s) < 12; i++) to = spot(r);
     if (t + (Math.abs(to - s) + Math.abs(end - to)) / SPEED + 100 > SPAN) break; // leave time to get to the next span's start
     walk(to);
-    if (to < SILL_END) { // up on the sill: settle and watch the skies
-      if (r() < 0.65) rest("loaf", 30 + r() * 60, true); else rest("sit", 10 + r() * 20, true);
-    } else if (r() < 0.3 + 0.35 * (1 - m.impulsive)) { // calm cats stop more; relaxed ones loaf
-      const p = r();
-      if (p < 0.2 + 0.35 * (1 - m.skittish)) rest("loaf", 20 + r() * 35);
-      else if (p < 0.75) rest("sit", 6 + r() * 18);
-      else rest("stand", 2 + r() * 4);
-    }
+    if (to === BED) rest("loaf", 90 + r() * 240 * (1 - 0.5 * m.impulsive), false, true); // the long snooze
+    else if (r() < 0.55) rest("loaf", 20 + r() * 50, true); else rest("sit", 10 + r() * 20, true); // watching a sky
   }
   walk(end);
-  rest(SPAN - t > 12 ? "sit" : "stand", SPAN - t, end < SILL_END);
+  rest(end === BED ? "loaf" : SPAN - t > 12 ? "sit" : "stand", SPAN - t, end !== BED, end === BED);
   return (cached = { k, ev }).ev;
 }
 
@@ -454,12 +449,12 @@ function catAt(sec) {
     const target = e.pose === "sit" ? sitPose() : e.pose === "loaf" ? loafPose() : standPose();
     if (e.sill) target.head[1] -= 1.2; // chin up, looking out
     pose = blend(walkPose(phase, 1 - smooth(edge / 0.5)), target, smooth(edge / 1.4));
-    asleep = e.pose === "loaf" && !e.sill && edge > 6;
+    asleep = e.bed && edge > 6;
   }
   pose.body[3] *= 1 + 0.035 * Math.sin(sec * 2.2); // breathing
   pose.tail[4] += Math.sin(sec * 1.7 + SEED) * 0.7 * (0.4 + CAT.mind.impulsive); // tail tip never quite still
   const b = sec / 3.3, blink = b % 1 < 0.045 && hash(SEED, Math.floor(b), 9) < 0.7;
-  return { x: Math.round(g.x), y: Math.round(g.y), dir, tilt: tiltAt(s, dir), pose, eyesShut: asleep || blink };
+  return { x: Math.round(g.x), y: Math.round(g.y), dir, tilt: tiltAt(s, dir), pose, eyesShut: asleep || blink, s };
 }
 
 // Shape tests in the cat's local frame. Each hit returns coat coordinates and a surface normal.
@@ -525,15 +520,17 @@ const light = new Float32Array(W * H * 3); // this frame's light at every pixel,
 const catMask = new Uint8Array(W * H);     // which part of the cat covers each pixel, +1; 0 = none
 function drawCat(d, cat) {
   const list = shapes(cat.pose), { x: cx, y: gy, dir, tilt } = cat, ca = Math.cos(tilt), sa = Math.sin(tilt);
-  const x0 = Math.max(1, cx - 20), x1 = Math.min(W - 2, cx + 20), y0 = Math.max(1, gy - 26), y1 = Math.min(H - 2, gy + 8);
+  const x0 = Math.max(1, cx - 20), x1 = Math.min(W - 2, cx + 20), y0 = Math.max(1, gy - 26), y1 = Math.min(H - 2, gy + 12);
   catMask.fill(0);
   for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
     const j = y * W + x;
     if (fg[j]) continue; // behind the table and chairs
     const sx = (x + 0.5 - cx) * dir, sy = y + 0.5 - gy, lx = sx * ca + sy * sa, ly = -sx * sa + sy * ca;
-    if (ly > 0) continue;
     let s = null, h = null;
-    for (const sh of list) { const r = sh.hit(sh.g, lx, ly); if (r) { s = sh; h = r; } }
+    for (const sh of list) { // only a tail may hang below the ledge
+      if (ly > 0 && sh.part !== 5) continue;
+      const r = sh.hit(sh.g, lx, ly); if (r) { s = sh; h = r; }
+    }
     if (!s) continue;
     // Lit by the room's light where it stands: on the sill each half's sky, by the table the mix.
     const albedo = coat(s.part, s.tu !== undefined ? s.tu * 12 : h.cu, h.cv, whiteness(s, h));
@@ -557,6 +554,251 @@ function drawCat(d, cat) {
     const i = j * 4, lum = (d[i] + d[i + 1] + d[i + 2]) / 3;
     for (let k = 0; k < 3; k++) d[i + k] = lum < 48 ? d[i + k] + [30, 32, 44][k] : d[i + k] * 0.45;
   }
+}
+
+// ---------------------------------------------------------------- the cat notices the guests
+// When a guest sits down, the cat wakes and comes along the sill to just above them, looks down,
+// gives a slow blink (cat for "I trust you"), then lies at the edge with its tail hanging over,
+// before going back to whatever its day was doing.
+const ABOVE = [88, 167]; // sill spots just above each chair
+let visit = null, catS = BED, catLast = 0;
+function visitGuest(side, t) {
+  if (visit && visit.phase !== "back") return; // already busy with someone
+  visit = { side, phase: "go", t0: t, s: catS, dist: 0, stay: 40 + 30 * CAT.mind.friendly };
+}
+function danglePose() { // lying at the edge of the sill, tail hanging over it
+  const p = loafPose(), L = CAT.body.len;
+  p.tail = [-L + 0.6, -1.5, -L - 0.8, 3, -L + 0.2, 10, 1.0];
+  p.front = 0;
+  return p;
+}
+function catShown(sec, t) {
+  const base = catAt(sec), dt = Math.min(0.25, t - catLast);
+  catLast = t;
+  if (!visit) { catS = base.s; return base; }
+  const v = visit;
+  let pose, dir, eyesShut = false;
+  if (v.phase === "stay") {
+    const st = t - v.t0, seated = smooth(st / 1.2), lie = smooth((st - 16) / 1.6);
+    const sit = sitPose(); sit.head[0] += 0.6; sit.head[1] += 1.3; // chin down, looking at the guest
+    pose = blend(blend(walkPose(0, 0), sit, seated), danglePose(), lie);
+    dir = v.side === 0 ? 1 : -1;
+    eyesShut = (st > 3.2 && st < 4.3) || (st > 8.5 && st < 9.6) || (st > 24 && st < 25.2); // slow blinks
+    if (st > v.stay) { v.phase = "back"; v.t0 = t; }
+  } else {
+    const goal = v.phase === "go" ? sAt(ABOVE[v.side]) : base.s, d = goal - v.s, step = SPEED * 1.5 * dt;
+    if (Math.abs(d) <= step) {
+      v.s = goal;
+      if (v.phase === "go") { v.phase = "stay"; v.t0 = t; } else { visit = null; catS = base.s; return base; }
+    } else { v.s += Math.sign(d) * step; v.dist += step; }
+    const back = v.phase === "back" ? smooth((t - v.t0) / 1.2) : 1; // stand up from lying before walking off
+    pose = blend(danglePose(), walkPose(v.dist / STRIDE, 1), back);
+    dir = facingAt(v.s, Math.sign(d) || 1);
+  }
+  pose.body[3] *= 1 + 0.035 * Math.sin(sec * 2.2);
+  pose.tail[4] += Math.sin(sec * 1.7 + SEED) * 0.7 * (0.4 + CAT.mind.impulsive);
+  catS = v.s;
+  return { x: Math.round(along(v.s).x), y: SILL_Y, dir, tilt: 0, pose, eyesShut };
+}
+
+// ---------------------------------------------------------------- the guests
+// Two guests, one per side: the link's a on the left, b on the right. Whoever opens the link
+// walks in from their own side and sits. The other is there too when they have the link open:
+// already sitting if they were here first, walking in from their side if they arrive while you watch.
+// A link with &me=a is the left guest's own; without it, it's the right guest's.
+const ME = LINK.get("me") === "a" ? 0 : 1;
+const FEET = 135, SEAT = 24, WALK = 20, SIT_T = 1.3; // floor line; seat height; px per second; seconds to sit or stand
+const LOOKS = [
+  { // left: white short-sleeved shirt, Japanese indigo denim, white sneakers with three black stripes, wild golden-brown hair
+    k: 1, heel: 1, R: 5.6, skin: [228, 186, 152], hair: [142, 94, 46], hairHi: [210, 162, 88],
+    top: [238, 236, 228], legs: [44, 64, 106], legsHi: [78, 102, 150], shoe: [242, 240, 234], mark: [24, 24, 28]
+  },
+  { // right: black hair, glasses, a black satin night dress, burgundy heels
+    k: 0.9, heel: 2.6, R: 5.1, skin: [218, 168, 132], hair: [20, 16, 22], hairHi: [96, 86, 110],
+    top: [26, 20, 30], topHi: [132, 112, 146], shoe: [150, 22, 50], mark: [64, 8, 22], lips: [164, 62, 74], glass: [12, 10, 14]
+  }
+];
+const GUESTS = [0, 1].map(side => {
+  const outX = side ? W + 18 : -18;
+  return { side, dir: side ? -1 : 1, seatX: side ? 178 : 77, outX, look: LOOKS[side],
+    present: false, since: 0, fromX: outX, fromSit: 0, x: outX, sit: 0, dist: 0, facing: side ? -1 : 1, seated: false };
+});
+function setPresent(g, on, t, already = false) {
+  if (g.present === on) return;
+  g.present = on; g.since = t; g.fromX = g.x; g.fromSit = g.sit;
+  if (on && already) { g.x = g.fromX = g.seatX; g.sit = g.fromSit = 1; g.seated = true; } // they were here first
+}
+function stepGuest(g, t) {
+  const e = t - g.since, prevX = g.x;
+  if (g.present) { // walk to the chair, then sit
+    const dur = Math.abs(g.seatX - g.fromX) / WALK;
+    g.x = lerp(g.fromX, g.seatX, dur ? clamp01(e / dur) : 1);
+    g.sit = dur ? clamp01((e - dur) / SIT_T) : clamp01(g.fromSit + e / SIT_T);
+  } else { // stand up, then walk out on their own side
+    const up = g.fromSit * SIT_T, dur = Math.abs(g.outX - g.fromX) / WALK;
+    g.sit = clamp01(g.fromSit - e / SIT_T);
+    g.x = lerp(g.fromX, g.outX, dur ? clamp01((e - up) / dur) : 1);
+  }
+  g.moving = Math.abs(g.x - prevX) > 1e-3;
+  g.dist += Math.abs(g.x - prevX);
+  if (g.moving) g.facing = Math.sign(g.x - prevX); else if (g.sit > 0) g.facing = g.dir;
+  if (g.sit >= 1 && !g.seated) { g.seated = true; visitGuest(g.side, t); }
+  if (g.sit < 1) g.seated = false;
+}
+
+// A guest's body as joints in their own frame: x forward, y up from the floor (negative). 1 px is about 2 cm.
+function guestJoints(g, t) {
+  const L = g.look, k = L.k, amp = g.moving ? 1 : 0, ph = g.dist / (15 * k) * 2 * Math.PI;
+  const sw = Math.sin(ph) * 0.42 * amp, bob = -Math.abs(Math.sin(ph)) * 0.8 * amp;
+  const hipS = [0, -(42 * k + L.heel) + bob];
+  const leg = (a, bend) => {
+    const kn = [hipS[0] + Math.sin(a) * 21 * k, hipS[1] + Math.cos(a) * 21 * k];
+    return [kn, [kn[0] + Math.sin(a - bend) * 20 * k, kn[1] + Math.cos(a - bend) * 20 * k]];
+  };
+  const [kn1, an1] = leg(sw, Math.max(0, Math.sin(ph + 1.2)) * 0.6 * amp);
+  const [kn2, an2] = leg(-sw, Math.max(0, Math.sin(ph + 1.2 + Math.PI)) * 0.6 * amp);
+  const shS = [1.2 * k, hipS[1] - 26 * k];
+  const arm = a => { const el = [shS[0] + Math.sin(a) * 12 * k, shS[1] + Math.cos(a) * 12 * k];
+    return [el, [el[0] + Math.sin(a + 0.3) * 11 * k, el[1] + Math.cos(a + 0.3) * 11 * k]]; };
+  const [el1, ha1] = arm(-sw * 0.8), [el2, ha2] = arm(sw * 0.8);
+  const stand = { hip: hipS, kn1, an1, kn2, an2, sh: shS, el1, ha1, el2, ha2 };
+  // Sitting: thighs under the table, elbows resting on it, breathing.
+  const br = Math.sin(t * 1.7 + g.side * 2) * 0.35, hip = [0, -SEAT - 0.5];
+  const sit = {
+    hip, kn1: [21 * k + 1, -SEAT - 1.2], an1: [22 * k + 1.5, -L.heel - 0.8], kn2: [20 * k + 1, -SEAT - 1], an2: [20.5 * k + 1.5, -L.heel - 0.6],
+    sh: [4.5 * k, hip[1] - 25.5 * k + br], el1: [15.5, -38.3], ha1: [25, -38.6], el2: [14, -38.5], ha2: [23.5, -38.8]
+  };
+  const J = blend(stand, sit, smooth(g.sit));
+  J.neck = [J.sh[0] + 0.7 * k, J.sh[1] - 3 * k];
+  J.head = [J.neck[0] + 0.9 * k, J.neck[1] - 5.4 * k];
+  return J;
+}
+
+function guestShapes(g, J) {
+  const L = g.look, k = L.k, her = g.side === 1, R = L.R, S = [];
+  const cap = (a, b, r, part, o) => S.push({ hit: hitCapsule, g: [a[0], a[1], b[0], b[1], r], part, ...o });
+  const ell = (c, rx, ry, part, o) => S.push({ hit: hitEllipse, g: [c[0], c[1], rx, ry, 0], part, ...o });
+  const add = (a, b) => [a[0] + b[0], a[1] + b[1]];
+  const foot = (an, dim) => {
+    if (her) { cap(an, add(an, [5.6 * k, L.heel + 0.2]), 1.1, "shoe", { dim }); cap(add(an, [-1.2, 0.6]), add(an, [-1.3, L.heel + 0.3]), 0.55, "heel", { dim }); }
+    else cap(add(an, [-1.5, 0.2]), add(an, [7, 0.2]), 1.6, "shoe", { dim });
+  };
+  // far side first, dimmer: arm, leg, foot
+  cap(J.sh, J.el2, 1.6 * k, "arm", { dim: 0.7 }); cap(J.el2, J.ha2, 1.4 * k, "skin", { dim: 0.7 });
+  cap(J.hip, J.kn2, (her ? 1.9 : 2.7) * k, "leg", { dim: 0.74 }); cap(J.kn2, J.an2, (her ? 1.4 : 2.4) * k, "shin", { dim: 0.74 }); foot(J.an2, 0.74);
+  // hair that falls behind
+  if (her) { cap(add(J.head, [-1.6 * k, -0.5]), add(J.sh, [-2.4 * k, 4.5 * k]), R * 0.86, "hair"); ell(add(J.head, [-0.6, -0.9]), R + 0.9, R + 0.7, "hair"); }
+  else ell(add(J.head, [-1.1, -1.4]), R + 1.4, R + 0.9, "hair");
+  // torso
+  if (her) {
+    ell(add(J.hip, [0.2 * k, -1.8 * k]), 4.7 * k, 4.3 * k, "torso");
+    cap(add(J.hip, [0, -3 * k]), add(J.sh, [0.4 * k, 8 * k]), 3.2 * k, "torso");
+    ell(add(J.sh, [1 * k, 5.2 * k]), 4.5 * k, 5.4 * k, "torso");
+  } else cap(add(J.hip, [0.3, 1.6]), J.sh, 5.4 * k, "torso");
+  // near leg and foot; her dress falls over the thighs
+  cap(J.hip, J.kn1, (her ? 1.9 : 2.7) * k, "leg"); cap(J.kn1, J.an1, (her ? 1.4 : 2.4) * k, "shin"); foot(J.an1, 1);
+  if (her) cap(add(J.hip, [0, -1]), [lerp(J.hip[0], (J.kn1[0] + J.kn2[0]) / 2, 0.86), lerp(J.hip[1], (J.kn1[1] + J.kn2[1]) / 2, 0.86)], 3.5 * k, "skirt");
+  // neck, head, the hair over it, and the near arm
+  cap(J.sh, J.neck, 1.5 * k, "skin");
+  ell(J.head, R, R, "skin");
+  if (her) ell(add(J.head, [1.3 * k, -R * 0.68]), R * 0.8, R * 0.36, "hair"); // a straight fringe
+  else {
+    ell(add(J.head, [1.2, -R * 0.7]), R * 0.82, R * 0.42, "hair");
+    for (const [ax, ay, bx, by] of [[-2, -R, -4, -R - 2.6], [0.5, -R - 0.3, 0.2, -R - 2.9], [2.6, -R + 0.4, 4.4, -R - 1.4], [-4.2, -R + 1.6, -6.6, -R + 0.4], [-5, -1, -7.4, 0.6]])
+      cap(add(J.head, [ax, ay]), add(J.head, [bx, by]), 1.1, "hair"); // wild, messy tufts
+  }
+  cap(J.sh, J.el1, 1.6 * k, "arm"); cap(J.el1, J.ha1, 1.4 * k, "skin"); ell(J.ha1, 1.4 * k, 1.3 * k, "skin");
+  return S;
+}
+
+const STRIPES = [[0.3, 0.39], [0.46, 0.55], [0.62, 0.71]];
+const mixC = (a, b, w) => a.map((v, i) => lerp(v, b[i], w));
+function guestColor(g, J, s, h, lx, ly) {
+  const L = g.look, her = g.side === 1;
+  const satin = () => mixC(L.top, L.topHi, clamp01((h.nz - 0.55) * 2.4) * clamp01(0.4 - h.ny));
+  switch (s.part) {
+    case "skin": return L.skin;
+    case "arm": return !her && h.u < 0.55 ? L.top : L.skin; // short sleeves
+    case "leg": case "shin": return her ? L.skin : mixC(L.legs, L.legsHi, h.nz > 0.75 ? 0.45 : 0.12 * grain(Math.floor(lx), Math.floor(ly)));
+    case "shoe":
+      if (her) return h.v > 0.45 ? L.mark : L.shoe;
+      return Math.abs(h.v) < 0.7 && STRIPES.some(([a, b]) => h.u >= a && h.u <= b) ? L.mark : L.shoe;
+    case "heel": return L.mark;
+    case "torso":
+      if (her) return ly < J.sh[1] + 2.6 ? (Math.abs(lx - J.sh[0] - 0.6) < 0.7 ? L.top : L.skin) : satin(); // bare shoulders, thin straps
+      return mixC(L.top, [200, 198, 192], 0.25 * grain(Math.floor(lx * 0.7), Math.floor(ly * 0.5))); // a little crumpled
+    case "skirt": return satin();
+    case "hair": {
+      const n = hash(77, Math.floor(lx * 1.4), Math.floor(ly * 1.4));
+      return her ? mixC(L.hair, L.hairHi, h.nz > 0.7 && h.ny < -0.2 ? 0.5 : 0) : mixC(L.hair, L.hairHi, n > 0.72 ? 0.7 : 0.15 * n);
+    }
+  }
+  return L.skin;
+}
+
+const guestMask = new Uint8Array(W * H);
+function drawGuest(d, g, t) {
+  const J = guestJoints(g, t), list = guestShapes(g, J), f = g.facing, gx = Math.round(g.x);
+  const x0 = Math.max(1, gx + Math.min(-14 * f, 32 * f)), x1 = Math.min(W - 2, gx + Math.max(-14 * f, 32 * f));
+  const y0 = Math.max(1, FEET - 92), y1 = Math.min(H - 2, FEET + 1);
+  for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+    const lx = (x + 0.5 - g.x) * f, ly = y + 0.5 - FEET;
+    let s = null, h = null;
+    for (const sh of list) { const r = sh.hit(sh.g, lx, ly); if (r) { s = sh; h = r; } }
+    if (!s) continue;
+    const j = y * W + x, c = guestColor(g, J, s, h, lx, ly);
+    const shade = (0.58 + 0.55 * Math.max(0, -0.7 * h.ny + 0.7 * h.nz)) * (s.dim || 1);
+    for (let k = 0; k < 3; k++) d[j * 4 + k] = q(c[k] * light[j * 3 + k] * shade, x, y);
+    guestMask[j] = g.side + 1;
+  }
+  // The face, a few pixels: eye, nose, mouth, and her glasses. Looking up when the cat is above.
+  const L = g.look, R = L.R, up = g.lookUp ? 1 : 0, [hx, hy] = J.head;
+  const px = (lx, ly, c, any = false) => {
+    const x = Math.floor(g.x + lx * f), y = Math.floor(FEET + ly), j = y * W + x;
+    if (x < 0 || x >= W || (!any && guestMask[j] !== g.side + 1)) return;
+    for (let k = 0; k < 3; k++) d[j * 4 + k] = q(c[k] * light[j * 3 + k] * 0.95, x, y);
+    guestMask[j] = g.side + 1;
+  };
+  px(hx + R * 0.52, hy - 0.4 - up, [34, 24, 22]);
+  px(hx + R + 0.4, hy + 0.8 - up * 0.6, L.skin, true);
+  px(hx + R * 0.74, hy + 2.6 - up * 0.5, g.side ? L.lips : [176, 116, 100]);
+  if (g.side) {
+    for (let i = -0.4; i <= R * 0.95; i += 0.9) px(hx + i, hy - 1.2 - up, L.glass);    // temple and the top of the frame
+    px(hx + R * 0.95, hy - 0.4 - up, L.glass); px(hx + R * 0.95, hy + 0.5 - up, L.glass); // the lens edge
+  }
+  // outline, like the cat's: dark against light, a faint pale rim against the dark
+  for (let y = y0 - 1; y <= y1 + 1; y++) for (let x = x0 - 1; x <= x1 + 1; x++) {
+    const j = y * W + x;
+    if (guestMask[j] || !(guestMask[j - 1] === g.side + 1 || guestMask[j + 1] === g.side + 1 || guestMask[j - W] === g.side + 1 || guestMask[j + W] === g.side + 1)) continue;
+    const i = j * 4, lum = (d[i] + d[i + 1] + d[i + 2]) / 3;
+    for (let k = 0; k < 3; k++) d[i + k] = lum < 48 ? d[i + k] + [26, 28, 38][k] : d[i + k] * 0.5;
+  }
+}
+
+// ---------------------------------------------------------------- presence
+// Each open page checks in every 15 s with a hash of the link (never the places themselves) and
+// learns whether the other side is here. Without a real link, or with the server unreachable,
+// the room simply shows you alone.
+const LOCAL = location.protocol === "file:" || ["localhost", "127.0.0.1"].includes(location.hostname);
+const PRESENCE = (LOCAL && new URLSearchParams(location.search).get("presence")) || "https://hotel-dada-presence.popadenisro.workers.dev";
+const ROOM_ID = LINK.has("a") && LINK.has("b") ? roomId(LINK.get("a") + "|" + LINK.get("b")) : null;
+const MY_SIDE = ME ? "b" : "a";
+function roomId(str) {
+  const codes = [...str].map(c => c.codePointAt(0));
+  return [1, 2, 3, 4].map(i => Math.floor(hash(i, ...codes) * 4294967296).toString(16).padStart(8, "0")).join("");
+}
+let firstAnswer = true;
+async function checkIn() {
+  if (!ROOM_ID) return;
+  try {
+    const r = await fetch(PRESENCE, { method: "POST", body: JSON.stringify({ room: ROOM_ID, side: MY_SIDE }) });
+    const here = await r.json();
+    setPresent(GUESTS[1 - ME], !!here[ME ? "a" : "b"], performance.now() / 1000, firstAnswer);
+    firstAnswer = false;
+  } catch { /* the room works without it */ }
+}
+function leave() {
+  if (ROOM_ID) navigator.sendBeacon(PRESENCE, JSON.stringify({ room: ROOM_ID, side: MY_SIDE, leave: true }));
 }
 
 // ---------------------------------------------------------------- music from the kitty speaker
@@ -624,8 +866,8 @@ function frame(now) {
     sunX: Math.round(HW / 2 + (ha / 90) * (HW / 2)), sunY: Math.round(HZ - (alt / 60) * HZ),
     col: keyed(LIGHT, alt)[0].map(v => v * 0.8)
   }));
-  // The lamp on the table comes on at dusk on the left side and goes off at its dawn.
-  lampLevel = lerp(lampLevel, suns[0].alt < -3 ? 1 : 0, Math.min(1, dt / 300));
+  // The lamp on the table is shared: it is on whenever either side is in the dark.
+  lampLevel = lerp(lampLevel, Math.min(suns[0].alt, suns[1].alt) < -3 ? 1 : 0, Math.min(1, dt / 300));
 
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
     const j = y * W + x, i = j * 4;
@@ -672,12 +914,20 @@ function frame(now) {
   }
 
   // The cat keeps real time even when the skies run fast, so it stays a cat and not a blur.
-  drawCat(d, catAt(Date.now() / 1000));
+  drawCat(d, catShown(Date.now() / 1000, now / 1000));
+
+  // The guests, in front of everything but the seam.
+  guestMask.fill(0);
+  for (const g of GUESTS) {
+    stepGuest(g, now / 1000);
+    g.lookUp = !!visit && visit.phase === "stay" && visit.side === g.side && now / 1000 - visit.t0 > 1.4 && now / 1000 - visit.t0 < 9;
+    if (g.present || Math.abs(g.x - g.outX) > 0.5) drawGuest(d, g, now / 1000);
+  }
 
   // The seam: a thin line in the back wall, up through the window. Faint where the cat crosses it.
   for (let y = 0; y < WALL_BASE; y += 2) {
     const j = y * W + SEAM, i = j * 4;
-    if (fg[j] || (y >= SILL_Y && y <= SILL_Y + 6)) continue;
+    if (fg[j] || guestMask[j] || (y >= SILL_Y && y <= SILL_Y + 6)) continue;
     const a = catMask[j] ? 0.3 : kind[j] === GLASS ? 0.55 : 0.3;
     for (let k = 0; k < 3; k++) d[i + k] = lerp(d[i + k], [214, 206, 188][k], a);
   }
@@ -702,6 +952,11 @@ bMusic.onclick = () => {
   musicOn ? music.ac.resume() : music.ac.suspend();
   bMusic.ariaPressed = String(musicOn);
 };
+setPresent(GUESTS[ME], true, performance.now() / 1000); // you walk in
+checkIn();
+setInterval(() => { if (!document.hidden) checkIn(); }, 15000);
+addEventListener("pagehide", leave);
+document.addEventListener("visibilitychange", () => document.hidden ? leave() : checkIn());
 requestAnimationFrame(frame);
 </script>
 </body>
