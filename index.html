@@ -943,12 +943,17 @@ const SEATED = {
 const SIL = [22, 18, 28];
 SEATED.him.sil = [16, 20, 44]; // midnight blue
 SEATED.her.sil = [42, 14, 30]; // deep wine
+// Where each drawn torso holds its shoulder, relative to the hip, and where its chest ends.
+Object.assign(SEATED.him, { cut: 9, shoulder: [4.5, -23.5], pelvis: [5.5, 4], arm: [1.6, 1.4], thigh: 2.6, shin: 2.2 });
+Object.assign(SEATED.her, { cut: 11, shoulder: [4.5, -18.5], pelvis: [6, 4], arm: [1.2, 1.0], thigh: 2.1, shin: 1.3 });
 for (const sp of Object.values(SEATED)) { // flatten to pixels: local x from the hip, y up from the floor
   sp.px = [];
   for (const [r, c, str] of sp.rows) for (let i = 0; i < str.length; i++) {
     const ch = str[i];
     if (ch !== ".") sp.px.push([c + i - 8, r - 66, sp.pal.accents.includes(ch) ? sp.pal[ch] : sp.sil, ch === "g"]);
   }
+  // The body that never changes: head and torso, without the legs or the forearm on the table.
+  sp.upper = sp.px.filter(([lx, ly]) => ly <= -29 && !(ly >= -48 && lx > sp.cut));
 }
 function drawSeated(d, g, t) {
   const sp = SEATED[g.side ? "her" : "him"], f = g.dir;
@@ -969,8 +974,53 @@ function drawSeated(d, g, t) {
 }
 
 const guestMask = new Uint8Array(W * H), NOIR = true;
+// One figure in every state: the hand-drawn head and torso ride on the hip, and the arms and legs
+// move as shapes in the same silhouette colour, so walking in and sitting down is one motion.
+function drawFigure(d, g, t) {
+  const sp = SEATED[g.side ? "her" : "him"], f = g.facing, J = guestJoints(g, t), her = g.side === 1, sit = smooth(g.sit);
+  const breath = Math.round(Math.sin(t * 1.7 + g.side * 2) * 0.4 * sit);
+  const hx = g.x + J.hip[0] * f, hy = FEET + J.hip[1] + 24.5;                       // the drawn hip, in the room
+  const sh = [J.hip[0] + sp.shoulder[0], J.hip[1] + sp.shoulder[1]];
+  const shift = [(sh[0] - J.sh[0]) * (1 - sit), (sh[1] - J.sh[1]) * (1 - sit)];   // walking arms follow the drawn shoulder
+  const mv = a => [a[0] + shift[0], a[1] + shift[1]];
+  const S = [], cap = (a, b, r, col) => S.push({ hit: hitCapsule, g: [a[0], a[1], b[0], b[1], r], col });
+  const shoe = her ? [196, 26, 44] : null;
+  const leg = (kn, an) => {
+    cap(J.hip, kn, sp.thigh); cap(kn, an, sp.shin);
+    if (her) { cap(an, [an[0] + 5, an[1] + 2.6], 1.0, shoe); cap([an[0] - 1.1, an[1] + 0.6], [an[0] - 1.2, an[1] + 2.9], 0.5, [120, 10, 26]); }
+    else cap([an[0] - 1.4, an[1] + 0.3], [an[0] + 6.4, an[1] + 0.3], 1.45);
+  };
+  cap(sh, mv(J.el2), sp.arm[0]); cap(mv(J.el2), mv(J.ha2), sp.arm[1]);
+  leg(J.kn2, J.an2);
+  S.push({ hit: hitEllipse, g: [J.hip[0] + 0.5, J.hip[1] - 1.5, sp.pelvis[0], sp.pelvis[1], 0] });
+  leg(J.kn1, J.an1);
+  cap(sh, mv(J.el1), sp.arm[0]); cap(mv(J.el1), mv(J.ha1), sp.arm[1]);
+  let x0 = W, x1 = 0;
+  const paint = (x, y, c, glint) => {
+    if (x < 0 || x >= W || y < 0 || y >= H) return;
+    const j = y * W + x;
+    for (let k = 0; k < 3; k++) d[j * 4 + k] = glint ? c[k] : q(c[k] * Math.min(1.4, 0.35 + light[j * 3 + k]), x, y);
+    guestMask[j] = g.side + 1; x0 = Math.min(x0, x); x1 = Math.max(x1, x);
+  };
+  const gx = Math.round(g.x);
+  for (let y = FEET - 70; y <= FEET + 2; y++) for (let x = gx - 16; x <= gx + 36; x++) { // the limbs
+    const lx = (x + 0.5 - g.x) * f, ly = y + 0.5 - FEET;
+    let hit = null;
+    for (const s2 of S) if (s2.hit(s2.g, lx, ly)) hit = s2;
+    if (hit) paint(x, y, hit.col || sp.sil, false);
+  }
+  for (let x = gx + 16; x >= gx - 36; x--) for (let y = FEET - 70; y <= FEET + 2; y++) { // facing left, the box runs the other way
+    if (f > 0) break;
+    const lx = (x + 0.5 - g.x) * f, ly = y + 0.5 - FEET;
+    let hit = null;
+    for (const s2 of S) if (s2.hit(s2.g, lx, ly)) hit = s2;
+    if (hit) paint(x, y, hit.col || sp.sil, false);
+  }
+  for (const [lx, ly, c, glint] of sp.upper) paint(Math.round(hx + lx * f), Math.round(hy + ly) + (ly < -22 ? breath : 0), c, glint);
+  rimLight(d, guestMask, g.side + 1, x0, x1, FEET - 72, FEET + 2, 1.6);
+}
 function drawGuest(d, g, t) {
-  if (g.sit > 0.6) return drawSeated(d, g, t);
+  return drawFigure(d, g, t);
   const J = guestJoints(g, t), list = guestShapes(g, J), f = g.facing, gx = Math.round(g.x);
   const x0 = Math.max(1, gx + Math.min(-14 * f, 32 * f)), x1 = Math.min(W - 2, gx + Math.max(-14 * f, 32 * f));
   const y0 = Math.max(1, FEET - 92), y1 = Math.min(H - 2, FEET + 1);
