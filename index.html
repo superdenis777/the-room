@@ -562,14 +562,14 @@ function whiteness(s, h) {
 const light = new Float32Array(W * H * 3); // this frame's light at every pixel, shared by the room and the cat
 // Rim light, as in the movies: the lamp catches the edge of a figure that faces it, and the window
 // catches the tops of heads and shoulders. mask holds the figure; id 0 means any non-zero value.
-function rimLight(d, mask, id, x0, x1, y0, y1) {
+function rimLight(d, mask, id, x0, x1, y0, y1, gain = 1) {
   const on = j => id ? mask[j] === id : mask[j] > 0;
   for (let y = Math.max(1, y0); y <= Math.min(H - 2, y1); y++) for (let x = Math.max(1, x0); x <= Math.min(W - 2, x1); x++) {
     const j = y * W + x;
     if (!on(j)) continue;
     const toward = x < 128 ? 1 : -1, i = j * 4, lamp = lampLevel * lampW[j];
-    if (!on(j + toward) && lamp > 0.08) for (let k = 0; k < 3; k++) d[i + k] = Math.min(255, d[i + k] + [150, 100, 54][k] * Math.min(1, lamp * 1.2));
-    if (!on(j - W)) { const m = mixR[j]; for (let k = 0; k < 3; k++) d[i + k] = Math.min(255, d[i + k] + 46 * lerp(sky0[k], sky1[k], m)); }
+    if (!on(j + toward) && lamp > 0.08) for (let k = 0; k < 3; k++) d[i + k] = Math.min(255, d[i + k] + gain * [150, 100, 54][k] * Math.min(1, lamp * 1.2));
+    if (!on(j - W) || !on(j - toward)) { const m = mixR[j]; for (let k = 0; k < 3; k++) d[i + k] = Math.min(255, d[i + k] + gain * 46 * lerp(sky0[k], sky1[k], m)); }
   }
 }
 let sky0 = [0, 0, 0], sky1 = [0, 0, 0]; // this frame's window light, for the rims
@@ -823,6 +823,7 @@ function guestShapes(g, J) {
 const mixC = (a, b, w) => a.map((v, i) => lerp(v, b[i], w));
 function guestColor(g, J, s, h, lx, ly) {
   const L = g.look;
+  if (!(g.side && (s.part === "shoe" || s.part === "heel"))) return SIL; // noir: only her red heels keep their colour
   const sheen = (base, hi) => mixC(base, hi, clamp01((h.nz - 0.55) * 2.4) * clamp01(0.4 - h.ny)); // satin catches the light
   const cloth = () => mixC(L.suit, L.suitHi, h.nz > 0.82 ? 0.3 : 0.1 * grain(Math.floor(lx), Math.floor(ly)));
   switch (s.part) {
@@ -867,18 +868,16 @@ function guestColor(g, J, s, h, lx, ly) {
 const SEATED = {
   him: {
     pal: {
-      o: [24, 18, 22], Y: [250, 222, 150], y: [222, 178, 98], h: [162, 112, 52], H: [104, 66, 32],
-      S: [236, 188, 148], s: [206, 148, 110], d: [150, 96, 72], e: [26, 18, 22], b: [96, 62, 32], m: [172, 96, 86],
+      o: [22, 16, 16], Y: [164, 126, 92], y: [122, 88, 62], h: [78, 54, 38], H: [42, 28, 22],
+      S: [240, 200, 172], s: [214, 168, 138], d: [164, 114, 92], e: [34, 24, 22], b: [44, 30, 24], m: [190, 122, 112], t: [226, 184, 154], // t: the jaw, clean-shaven
+      w: [238, 232, 226], n: [150, 100, 84], accents: "",
       W: [246, 244, 238], w: [190, 192, 204], T: [14, 12, 18], K: [96, 100, 124], J: [54, 56, 72], j: [32, 32, 44], L: [20, 20, 28],
       N: [48, 50, 64], n: [28, 28, 38], k: [84, 88, 108], B: [18, 16, 20], g: [150, 146, 156]
     },
-    eye: [18, 8], skin: "S",
+    eye: [], skin: "S",
     rows: [
-      // longer, messy golden-brown hair over the ears and down to the collar; a clean profile
-      [1, 11, "ooooo"], [2, 9, "oohyyYyoo"], [3, 7, "oohhyyYYyyho"], [4, 6, "ohhhhyyyYyyyho"], [5, 6, "oHhhhhyyyhyyyho"],
-      [6, 5, "oHHhhhhhyhhyhSSo"], [7, 5, "oHHHhhhhhhyhSSbo"], [8, 5, "oHHHhhhhHsSSSeSSo"], [9, 5, "oHHHhhhhHdsSSSSSSo"],
-      [10, 5, "oHHHhhhhHdssSSSSSSo"], [11, 5, "oHHHhhhHHdsSSSSSdo"], [12, 6, "oHHhhhHHdsSSSSmmo"], [13, 6, "oHHhhHHHddsSSSSo"],
-      [14, 6, "oHHhHHHHoddssSo"], [15, 6, "oHHhHHHoddsso"], [16, 6, "oHhHHoodsso"], [17, 6, "oHHHoodssdo"],
+      // a silhouette in profile: wavy hair swept back to the nape, a straight nose, a firm chin, a clean jaw
+      [0, 10, "#####"], [1, 8, "#########"], [2, 7, "############"], [3, 6, "#############"], [4, 5, "##############"], [5, 6, "#############"], [6, 5, "###############"], [7, 6, "#############"], [8, 5, "###############"], [9, 6, "###############"], [10, 5, "#################"], [11, 6, "##############"], [12, 6, "##############"], [13, 7, "############"], [14, 7, "#############"], [15, 7, "#############"], [16, 7, "###########"], [17, 7, "#########"], [0, 8, "#"], [1, 17, "#"], [3, 5, "#"], [9, 5, "#"], [13, 6, "#"],
       // a slim dark suit: lapels, white shirt, black tie, pocket square
       [18, 5, "ojJKKKWWsWo"], [19, 4, "ojJJKKKLWTWo"], [20, 4, "ojJJJKKLWTWo"], [21, 4, "ojJJJJKJLTWo"], [22, 4, "ojjJJJJWJLTo"],
       [23, 4, "ojjJJJJJJJLo"], ...[24, 25, 26, 27].map(r => [r, 5, "ojjJJJJJJJo"]), ...[28, 29, 30, 31, 32, 33].map(r => [r, 5, "ojjJJJJJJo"]),
@@ -899,17 +898,16 @@ const SEATED = {
   her: {
     pal: {
       o: [22, 14, 24], H: [16, 12, 20], h: [44, 36, 54], y: [110, 100, 132], Y: [170, 160, 196],
-      S: [240, 196, 164], s: [214, 160, 128], d: [160, 104, 84], e: [20, 14, 20], l: [12, 10, 14], m: [196, 30, 52], M: [140, 16, 36],
+      S: [240, 196, 164], s: [214, 160, 128], d: [176, 122, 100], e: [20, 14, 20], l: [12, 10, 14], m: [204, 34, 58], M: [150, 18, 40],
+      w: [240, 234, 230], n: [168, 112, 92], g: [226, 230, 246], accents: "mRrPgFf",
       R: [214, 32, 52], r: [150, 16, 34], G: [70, 120, 60], P: [244, 240, 230],
       D: [30, 22, 36], x: [16, 12, 20], X: [150, 128, 168], Z: [80, 66, 96], V: [22, 18, 26], v: [120, 106, 138], F: [196, 26, 44], f: [120, 10, 26]
     },
-    eye: [18, 10], skin: "S",
+    eye: [], skin: "S",
     rows: [
-      // glossy black waves past the shoulders, a red rose, cat-eye glasses, red lips, a pearl
-      [3, 10, "ooooo"], [4, 8, "oohhyyhoo"], [5, 7, "ohHhyYYyhho"], [6, 6, "oHHhhyYyyhhho"], [7, 5, "oHHHhhhhyhhhhHo"],
-      [8, 5, "oHRRHHhhhhhhHSlo"], [9, 5, "orRRHHHHdSSSllllo"], [10, 5, "oHGHHHHHdsSSSelSSo"], [11, 5, "oHHHHHHHPsSSSllSSSo"],
-      [12, 5, "oHHHHHHHHdsSSSSSSdo"], [13, 5, "oHHHHHHHHdsSSSSmMo"], [14, 5, "oHHHHHHHHHdsSSSSo"], [15, 5, "oHHHHHHHHHHddsSo"],
-      [16, 5, "oHHHyHHHHHHosso"], [17, 5, "oHHHHyHHHHHosSo"], [18, 5, "oHHHHHyHHHosSSo"],
+      // a silhouette in profile: high glossy waves, a small upturned nose, full red lips, a defined chin,
+      // a long neck; the cat-eye frame tips past her profile and catches the light; a rose
+      [1, 10, "#####"], [2, 8, "#########"], [3, 7, "###########"], [4, 6, "#############"], [5, 6, "##############"], [6, 5, "###############"], [7, 5, "##############"], [8, 5, "###############"], [9, 5, "###############"], [10, 5, "################"], [11, 5, "#################"], [12, 6, "##############"], [13, 6, "###############"], [14, 6, "##############"], [15, 6, "###############"], [16, 6, "##############"], [17, 6, "#############"], [18, 5, "############"], [8, 20, "g"], [13, 20, "m"], [15, 20, "m"], [6, 7, "Rr"], [7, 7, "r"],
       // a long neck, bare shoulders, a strapless satin bodice, a tiny waist, slim hips
       [19, 5, "oHHHHHHyHsSSSSo"], [20, 5, "ohHHHHHHsSSSSSSo"], [21, 5, "ohhHHHHdsSSSSSSo"], [22, 6, "ohhHHxDDXXDDZo"],
       [23, 6, "ohhxDDDXXXDDZo"], [24, 6, "ohxDDDDDXXDZo"], [25, 7, "oxDDDDDDDDZo"], [26, 7, "oxDDDDDDDZo"], [27, 7, "oxDDDDDDZo"],
@@ -928,32 +926,34 @@ const SEATED = {
     ]
   }
 };
+// Noir: the guests are silhouettes. Only their accents keep colour; the room's light finds their edges.
+const SIL = [22, 18, 28];
 for (const sp of Object.values(SEATED)) { // flatten to pixels: local x from the hip, y up from the floor
   sp.px = [];
-  for (const [r, c, str] of sp.rows) for (let i = 0; i < str.length; i++) if (str[i] !== ".") sp.px.push([c + i - 8, r - 66, sp.pal[str[i]]]);
+  for (const [r, c, str] of sp.rows) for (let i = 0; i < str.length; i++) {
+    const ch = str[i];
+    if (ch !== ".") sp.px.push([c + i - 8, r - 66, sp.pal.accents.includes(ch) ? sp.pal[ch] : SIL, ch === "g"]);
+  }
 }
 function drawSeated(d, g, t) {
-  const sp = SEATED[g.side ? "her" : "him"], f = g.dir, up = g.lookUp ? 1 : 0;
+  const sp = SEATED[g.side ? "her" : "him"], f = g.dir;
   let x0 = W, x1 = 0;
-  for (const [lx, ly, c] of sp.px) {
+  for (const [lx, ly, c, glint] of sp.px) {
     const x = Math.round(g.x) + lx * f, y = FEET + ly + (ly < -22 ? Math.round(Math.sin(t * 1.7 + g.side * 2) * 0.4) : 0); // breathing
     if (x < 0 || x >= W || y < 0 || y >= H) continue;
     const j = y * W + x;
-    for (let k = 0; k < 3; k++) d[j * 4 + k] = q(c[k] * Math.min(1.25, light[j * 3 + k] * 1.15), x, y);
+    for (let k = 0; k < 3; k++) d[j * 4 + k] = glint ? c[k] : q(c[k] * Math.min(1.4, 0.35 + light[j * 3 + k]), x, y);
     guestMask[j] = g.side + 1; x0 = Math.min(x0, x); x1 = Math.max(x1, x);
   }
-  // blinking, and glancing up when the cat is above
-  const [ec, er] = sp.eye, ex = Math.round(g.x) + (ec - 8) * f, ey = FEET + er - 66;
-  const blink = (t + g.side * 1.7) % (g.side ? 4.3 : 5.1) < 0.14;
-  if (blink || up) {
-    const j = ey * W + ex, sk = sp.pal[sp.skin];
-    for (let k = 0; k < 3; k++) d[j * 4 + k] = q((blink ? sk[k] * 0.8 : sk[k]) * light[j * 3 + k], ex, ey);
-    if (up && !blink) { const j2 = (ey - 1) * W + ex; for (let k = 0; k < 3; k++) d[j2 * 4 + k] = q(sp.pal.e[k] * light[j2 * 3 + k], ex, ey - 1); }
+  // blinking: the eyes close for a moment now and then
+  if ((t + g.side * 1.7) % (g.side ? 4.3 : 5.1) < 0.14) for (const [ec, er] of sp.eye) {
+    const ex = Math.round(g.x) + (ec - 8) * f, ey = FEET + er - 66 + Math.round(Math.sin(t * 1.7 + g.side * 2) * 0.4), j = ey * W + ex, sk = sp.pal.s;
+    for (let k = 0; k < 3; k++) d[j * 4 + k] = q(sk[k] * light[j * 3 + k], ex, ey);
   }
-  rimLight(d, guestMask, g.side + 1, x0, x1, FEET - 68, FEET + 1);
+  rimLight(d, guestMask, g.side + 1, x0, x1, FEET - 68, FEET + 1, 1.6);
 }
 
-const guestMask = new Uint8Array(W * H);
+const guestMask = new Uint8Array(W * H), NOIR = true;
 function drawGuest(d, g, t) {
   if (g.sit > 0.6) return drawSeated(d, g, t);
   const J = guestJoints(g, t), list = guestShapes(g, J), f = g.facing, gx = Math.round(g.x);
@@ -969,7 +969,8 @@ function drawGuest(d, g, t) {
     for (let k = 0; k < 3; k++) d[j * 4 + k] = q(c[k] * light[j * 3 + k] * shade, x, y);
     guestMask[j] = g.side + 1;
   }
-  rimLight(d, guestMask, g.side + 1, x0, x1, y0, y1);
+  rimLight(d, guestMask, g.side + 1, x0, x1, y0, y1, 1.6);
+  if (NOIR) return;
   // The face, a few pixels: eye, nose, mouth, and her glasses. Looking up when the cat is above.
   const L = g.look, R = L.R, up = g.lookUp ? 1 : 0, [hx, hy] = J.head;
   const px = (lx, ly, c, any = false) => {
