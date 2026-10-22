@@ -251,6 +251,33 @@ for (const [x, y] of [[0, 81], [1, 81], [0, 80], [9, 81], [8, 81], [9, 80]]) put
 for (let y = 84; y <= 88; y++) for (let x = SPK + 2; x <= SPK + 7; x++)
   if ((x + y) % 2 === 0 && (x - SPK - 4.5) ** 2 + (y - 86) ** 2 <= 6.5) { put(x, y, [176, 166, 180]); GRILLE.push(y * W + x); }
 
+// A potted palm in the corner, as every grand hotel has: terracotta pot, ringed trunk, drooping fronds.
+for (let y = 124; y <= 135; y++) {
+  const w = Math.round(5 - (y - 124) * 0.12);
+  for (let x = 55 - w; x <= 55 + w; x++) put(x, y, y <= 125 ? [196, 112, 74] : tint([168, 88, 58], 0.85 + 0.2 * grain(x, y)));
+}
+for (let y = 100; y < 124; y++) put(55 + Math.round(Math.sin(y * 0.15) * 0.6), y, y % 3 ? [104, 76, 44] : [82, 58, 34]);
+for (const [ang, len] of [[-2.7, 15], [-2.3, 21], [-1.9, 22], [-1.5, 18], [-1.1, 22], [-0.7, 21], [-0.3, 15]])
+  for (let i = 0; i <= len; i++) {
+    const x = 55 + Math.cos(ang) * i, y = 100 + Math.sin(ang) * i + (i / len) ** 2 * 8;
+    put(Math.round(x), Math.round(y), [58, 112, 60]);
+    if (i > 3 && i % 2 === 0) { put(Math.round(x + Math.sin(ang) * 1.6), Math.round(y + 1.4), [44, 92, 48]); put(Math.round(x - Math.sin(ang) * 1.6), Math.round(y + 1.7), [76, 134, 72]); }
+  }
+// A small pot at the end of the sill, its pothos trailing down the brick.
+for (let y = 58; y < SILL_Y; y++) for (let x = 203; x <= 209; x++) put(x, y, y === 58 ? [196, 112, 74] : [164, 86, 56]);
+for (const [x0, len, ph] of [[204, 16, 0], [208, 11, 1.7], [201, 8, 3.1]]) for (let i = 0; i <= len; i++) {
+  const x = Math.round(x0 + Math.sin(i * 0.5 + ph) * 1.2), y = SILL_Y + 3 + i;
+  put(x, y, [52, 96, 52]);
+  if (i % 3 === 1) { put(x + 1, y, [80, 146, 76]); put(x - 1, y + 1, [62, 120, 62]); }
+}
+// The seam clock on the wall above the table: one face, one minute hand for both, two hour hands.
+const CLOCK = [128, 74];
+for (let dy = -5; dy <= 5; dy++) for (let dx = -5; dx <= 5; dx++) {
+  const r = Math.hypot(dx, dy), x = CLOCK[0] + dx, y = CLOCK[1] + dy;
+  if (r <= 3.9) fore(x, y, (dx === 0 && Math.abs(dy) === 3) || (dy === 0 && Math.abs(dx) === 3) ? [120, 100, 80] : [234, 224, 198]);
+  else if (r <= 4.9) fore(x, y, dy < 0 ? [206, 166, 92] : [160, 120, 60]);
+}
+
 // Foreground: the whole table, two empty chairs, and the lamp on the table.
 function chair(mirror) {
   const X = x => mirror ? W - 1 - x : x, c = [172, 120, 74], d = [120, 80, 50];
@@ -268,6 +295,22 @@ for (let x = 124; x <= 132; x++) fore(x, 97, [160, 128, 70]);
 for (let x = 126; x <= 130; x++) fore(x, 96, [160, 128, 70]);
 for (let y = 89; y <= 95; y++) fore(128, y, [150, 120, 64]);
 for (let y = 81; y <= 88; y++) { const h = Math.round(3 + (y - 81) * 0.7); for (let x = 128 - h; x <= 128 + h; x++) fore(x, y, [226, 206, 168], SHADE); }
+// Red roses in a bud vase.
+for (let y = 90; y <= 97; y++) for (let x = y < 94 ? 116 : 115; x <= (y < 94 ? 116 : 117); x++) fore(x, y, x === 117 || y === 97 ? [96, 132, 120] : [140, 182, 168]);
+for (const [x, y0] of [[114, 84], [116, 82], [118, 85]]) for (let y = y0 + 1; y < 90; y++) fore(Math.round(lerp(x, 116, (y - y0) / (90 - y0))), y, [56, 102, 50]);
+for (const [x, y] of [[113, 87], [119, 87]]) fore(x, y, [74, 128, 62]);
+for (const [x, y] of [[114, 84], [116, 82], [118, 85]]) {
+  fore(x, y, [196, 28, 46]); fore(x + 1, y, [160, 18, 36]); fore(x, y - 1, [222, 52, 70]); fore(x + 1, y - 1, [196, 28, 46]);
+}
+// His coffee, on a saucer, the handle toward him.
+for (let x = 102; x <= 110; x++) fore(x, 97, [214, 208, 196]);
+for (let y = 93; y <= 96; y++) for (let x = 104; x <= 108; x++) fore(x, y, y === 93 ? [70, 42, 28] : x === 108 ? [196, 190, 178] : [236, 232, 222]);
+fore(103, 94, [220, 214, 204]); fore(102, 95, [220, 214, 204]); fore(103, 96, [220, 214, 204]);
+// Her martini, with an olive.
+for (let x = 145; x <= 149; x++) fore(x, 97, [196, 206, 212]);
+for (let y = 92; y <= 96; y++) fore(147, y, [196, 206, 212]);
+for (let y = 86; y <= 91; y++) { const w = 91 - y; for (let x = 147 - w; x <= 147 + w; x++) fore(x, y, y === 86 ? [224, 232, 236] : y >= 88 ? [226, 216, 160] : [176, 190, 198]); }
+fore(146, 89, [96, 132, 44]); fore(147, 89, [190, 40, 40]);
 
 // How the window light reaches each pixel, fixed by the architecture:
 // mixR is how much of it comes from the right half (sharp right under the window, a soft
@@ -454,7 +497,7 @@ function catAt(sec) {
   pose.body[3] *= 1 + 0.035 * Math.sin(sec * 2.2); // breathing
   pose.tail[4] += Math.sin(sec * 1.7 + SEED) * 0.7 * (0.4 + CAT.mind.impulsive); // tail tip never quite still
   const b = sec / 3.3, blink = b % 1 < 0.045 && hash(SEED, Math.floor(b), 9) < 0.7;
-  return { x: Math.round(g.x), y: Math.round(g.y), dir, tilt: tiltAt(s, dir), pose, eyesShut: asleep || blink, s };
+  return { x: Math.round(g.x), y: Math.round(g.y), dir, tilt: tiltAt(s, dir), pose, eyesShut: asleep || blink, asleep, s };
 }
 
 // Shape tests in the cat's local frame. Each hit returns coat coordinates and a surface normal.
@@ -517,6 +560,29 @@ function whiteness(s, h) {
 }
 
 const light = new Float32Array(W * H * 3); // this frame's light at every pixel, shared by the room and the cat
+// Rim light, as in the movies: the lamp catches the edge of a figure that faces it, and the window
+// catches the tops of heads and shoulders. mask holds the figure; id 0 means any non-zero value.
+function rimLight(d, mask, id, x0, x1, y0, y1) {
+  const on = j => id ? mask[j] === id : mask[j] > 0;
+  for (let y = Math.max(1, y0); y <= Math.min(H - 2, y1); y++) for (let x = Math.max(1, x0); x <= Math.min(W - 2, x1); x++) {
+    const j = y * W + x;
+    if (!on(j)) continue;
+    const toward = x < 128 ? 1 : -1, i = j * 4, lamp = lampLevel * lampW[j];
+    if (!on(j + toward) && lamp > 0.08) for (let k = 0; k < 3; k++) d[i + k] = Math.min(255, d[i + k] + [150, 100, 54][k] * Math.min(1, lamp * 1.2));
+    if (!on(j - W)) { const m = mixR[j]; for (let k = 0; k < 3; k++) d[i + k] = Math.min(255, d[i + k] + 46 * lerp(sky0[k], sky1[k], m)); }
+  }
+}
+let sky0 = [0, 0, 0], sky1 = [0, 0, 0]; // this frame's window light, for the rims
+// Soft contact shadows: chairs, guests and the table on the floor, the cat on the sill.
+function shadow(d, cx, cy, rx, ry, a) {
+  for (let y = Math.round(cy - ry); y <= Math.round(cy + ry); y++) for (let x = Math.round(cx - rx); x <= Math.round(cx + rx); x++) {
+    if (x < 0 || x >= W || y < 0 || y >= H) continue;
+    const j = y * W + x, r = ((x - cx) / rx) ** 2 + ((y - cy) / ry) ** 2;
+    if (r > 1 || kind[j] === GLASS) continue;
+    const f = 1 - a * (1 - r);
+    d[j * 4] *= f; d[j * 4 + 1] *= f; d[j * 4 + 2] *= f;
+  }
+}
 const catMask = new Uint8Array(W * H);     // which part of the cat covers each pixel, +1; 0 = none
 function drawCat(d, cat) {
   const list = shapes(cat.pose), { x: cx, y: gy, dir, tilt } = cat, ca = Math.cos(tilt), sa = Math.sin(tilt);
@@ -547,6 +613,12 @@ function drawCat(d, cat) {
       : [20, 18, 14].map((v, k) => v * L[k] + [90, 140, 70][k] * shine * 0.7);
     for (let k = 0; k < 3; k++) d[i + k] = q(c[k], ex, ey);
   }
+  // Whiskers: two faint pale pixels off the muzzle.
+  for (const [wx, wy] of [[hx + 3.4, hy + 0.6], [hx + 4.3, hy + 0.2]]) {
+    const x = Math.floor(cx + (wx * ca - wy * sa) * dir), y = Math.floor(gy + wx * sa + wy * ca), j = y * W + x;
+    if (!catMask[j] && !fg[j]) for (let k = 0; k < 3; k++) d[j * 4 + k] = lerp(d[j * 4 + k], 228, 0.4);
+  }
+  rimLight(d, catMask, 0, x0, x1, y0, y1);
   // A one-pixel outline, like an old sprite: dark against light, a faint pale rim against the dark.
   for (let y = y0 - 1; y <= y1 + 1; y++) for (let x = x0 - 1; x <= x1 + 1; x++) {
     const j = y * W + x;
@@ -669,7 +741,7 @@ function guestJoints(g, t) {
   const br = Math.sin(t * 1.7 + g.side * 2) * 0.35, hip = [0, -SEAT - 0.5];
   const sit = {
     hip, kn1: [21 * k + 1, -SEAT - 1.2], an1: [22 * k + 1.5, -L.heel - 0.8], kn2: [20 * k + 1, -SEAT - 1], an2: [20.5 * k + 1.5, -L.heel - 0.6],
-    sh: [4.5 * k, hip[1] - 25.5 * k + br], el1: [15.5, -38.3], ha1: [25, -38.6], el2: [14, -38.5], ha2: [23.5, -38.8]
+    sh: [4.5 * k, hip[1] - 25.5 * k + br], el1: [15.5, -38.3], ha1: g.side ? [28.5, -39.4] : [25, -38.6], el2: [14, -38.5], ha2: [23.5, -38.8] // her hand on her glass
   };
   const J = blend(stand, sit, smooth(g.sit));
   J.neck = [J.sh[0] + 0.7 * k, J.sh[1] - 3 * k];
@@ -803,6 +875,7 @@ function drawGuest(d, g, t) {
     for (let k = 0; k < 3; k++) d[j * 4 + k] = q(c[k] * light[j * 3 + k] * shade, x, y);
     guestMask[j] = g.side + 1;
   }
+  rimLight(d, guestMask, g.side + 1, x0, x1, y0, y1);
   // The face, a few pixels: eye, nose, mouth, and her glasses. Looking up when the cat is above.
   const L = g.look, R = L.R, up = g.lookUp ? 1 : 0, [hx, hy] = J.head;
   const px = (lx, ly, c, any = false) => {
@@ -811,7 +884,9 @@ function drawGuest(d, g, t) {
     for (let k = 0; k < 3; k++) d[j * 4 + k] = q(c[k] * light[j * 3 + k] * 0.95, x, y);
     guestMask[j] = g.side + 1;
   };
-  px(hx + R * 0.55, hy - 0.5 - up, [30, 22, 20]);                                          // eye
+  const blink = (t + g.side * 1.7) % (g.side ? 4.3 : 5.1) < 0.14;
+  px(hx + R * 0.55, hy - 0.5 - up, blink ? mixC(L.skin, [90, 60, 50], 0.5) : [30, 22, 20]);  // eye, blinking now and then
+  px(hx + R * 0.5, hy + 1, mixC(L.skin, [226, 104, 104], g.side ? 0.35 : 0.15));            // a little colour in the cheek
   px(hx + R * 0.4, hy - 1.6 - up, g.side ? L.hair : mixC(L.hair, [40, 26, 14], 0.5));      // brow
   px(hx + R * 0.66, hy - 1.6 - up, g.side ? L.hair : mixC(L.hair, [40, 26, 14], 0.5));
   px(hx - R * 0.12, hy + 0.4, mixC(L.skin, [120, 70, 50], 0.35));                         // ear
@@ -821,6 +896,8 @@ function drawGuest(d, g, t) {
     px(hx + R * 0.95, hy - 0.4 - up, L.glass); px(hx + R * 0.95, hy + 0.5 - up, L.glass); // the lens edge
     px(hx + R * 1.05, hy - 2.1 - up, L.glass, true);                                     // the upswept corner
     px(hx - R * 0.1, hy + 1.7, L.pearl, true);
+    px(hx - R * 0.62, hy - 1.4, [206, 30, 48], true); px(hx - R * 0.62 - 1, hy - 1.4, [150, 16, 32], true); // a red rose behind her ear
+    px(hx - R * 0.62, hy - 2.4, [228, 56, 72], true); px(hx - R * 0.62 - 1, hy - 0.4, [70, 120, 60], true);
   }
   // outline, like the cat's: dark against light, a faint pale rim against the dark
   for (let y = y0 - 1; y <= y1 + 1; y++) for (let x = x0 - 1; x <= x1 + 1; x++) {
@@ -906,6 +983,72 @@ function musicLevel() {
 }
 const NOTE = [[1, 0], [2, 0], [1, 1], [1, 2], [0, 3], [1, 3]]; // a tiny eighth note
 
+// ---------------------------------------------------------------- the moon, the clock, the air
+// The real moon, at its true phase, in whichever window has it up and dark enough to see.
+// From the southern hemisphere it is the same moon turned the other way round.
+const SYNODIC = 29.530588853, NEW_MOON = Date.UTC(2000, 0, 6, 18, 14) / 864e5;
+function drawMoon(d, date, suns) {
+  const ph = (((date / 864e5 - NEW_MOON) / SYNODIC) % 1 + 1) % 1, k = Math.cos(2 * Math.PI * ph), R0 = 2.6;
+  for (let side = 0; side < 2; side++) {
+    const P = PLACES[side], dark = clamp01((-suns[side].alt - 2) / 8);
+    if (dark <= 0) continue;
+    const mha = ((suns[side].ha - ph * 360) % 360 + 540) % 360 - 180;
+    const alt = Math.asin(Math.cos(P.lat * rad) * Math.cos(mha * rad)) / rad; // close enough: the moon keeps near the equator
+    if (alt < 3) continue;
+    const mx = Math.round(HW / 2 + (mha / 90) * (HW / 2)), my = Math.round(HZ - (alt / 60) * HZ), flip = P.lat < 0 ? -1 : 1;
+    for (let dy = -5; dy <= 5; dy++) for (let dx = -5; dx <= 5; dx++) {
+      const lx = mx + dx, wy = my + dy, x = (side ? SEAM : WIN.x0) + lx, y = WIN.y0 + wy, j = y * W + x;
+      if (lx < 0 || lx >= HW || wy < 0 || kind[j] !== GLASS || wy >= skyline(side, lx)) continue;
+      const r = Math.hypot(dx, dy) / R0, i = j * 4;
+      if (r <= 1) {
+        const u = dx / R0 * flip, w = Math.sqrt(Math.max(0, 1 - (dy / R0) ** 2)), lit = ph < 0.5 ? u > k * w : u < -k * w;
+        const c = lit ? [238, 234, 214] : [48, 52, 74];
+        for (let n = 0; n < 3; n++) d[i + n] = lerp(d[i + n], c[n], dark);
+      } else {
+        const glow = Math.exp(-(r - 1) * 2) * 0.3 * dark * (1 - Math.abs(k)) ** 0.3; // brighter around a fuller moon
+        for (let n = 0; n < 3; n++) d[i + n] = Math.min(255, d[i + n] + [50, 52, 62][n] * glow);
+      }
+    }
+  }
+}
+// The clock's hands: a shared minute hand, his hour hand dark, hers red.
+function drawClock(d, date) {
+  const hand = (deg, len, c) => {
+    for (let t = 0.6; t <= len; t += 0.5) {
+      const x = Math.round(CLOCK[0] + Math.sin(deg * rad) * t), y = Math.round(CLOCK[1] - Math.cos(deg * rad) * t), j = y * W + x;
+      for (let n = 0; n < 3; n++) d[j * 4 + n] = q(c[n] * light[j * 3 + n], x, y);
+    }
+  };
+  const [ha, ma] = fmt(date, PLACES[0].tz).split(":").map(Number), [hb] = fmt(date, PLACES[1].tz).split(":").map(Number);
+  hand(ma * 6, 3.6, [92, 80, 66]);
+  hand((ha % 12 + ma / 60) * 30, 2.4, [30, 32, 46]);
+  hand((hb % 12 + ma / 60) * 30, 2.4, [176, 30, 48]);
+}
+// Warm bulbs along the window arch, on with the lamp; steam from the coffee; dust drifting in the light.
+const BULBS = [];
+for (let x = 50; x <= 205; x += 9) BULBS.push([x, Math.round(WIN.y0 + arch(x)) - 3]);
+const VIG = new Float32Array(W * H).map((_, j) => 1 - 0.34 * smooth(((j % W - 128) / 150) ** 2 + ((Math.floor(j / W) - 70) / 100) ** 2));
+function drawAir(d, now) {
+  const t = now / 1000;
+  if (lampLevel > 0.02) for (const [x, y] of BULBS) {
+    const a = lampLevel * (0.75 + 0.25 * Math.sin(t * 1.1 + x)), i = (y * W + x) * 4;
+    for (let n = 0; n < 3; n++) d[i + n] = lerp(d[i + n], [255, 214, 150][n], a);
+    for (const o of [-1, 1, -W, W]) for (let n = 0; n < 3; n++) d[i + o * 4 + n] = Math.min(255, d[i + o * 4 + n] + [60, 40, 18][n] * a);
+  }
+  for (let n = 0; n < 3; n++) { // three wisps of steam
+    const p = (t / 3.4 + n / 3) % 1, x = Math.round(106 + Math.sin(p * 5 + n * 2) * 1.6), y = Math.round(92 - p * 13), j = (y * W + x) * 4;
+    const a = (1 - p) * 0.45 * smooth(p * 8);
+    for (let m = 0; m < 3; m++) d[j + m] = lerp(d[j + m], [236, 230, 222][m], a);
+  }
+  for (let m = 0; m < 26; m++) { // dust, only visible where the light is strong
+    const x = Math.round(66 + hash(31, m) * 126 + Math.sin(t * 0.13 + m) * 6), y = Math.round(58 + (hash(32, m) * 52 + t * (0.5 + 0.7 * hash(33, m))) % 52);
+    const j = y * W + x, L = (light[j * 3] + light[j * 3 + 1] + light[j * 3 + 2]) / 3;
+    const a = clamp01((L - 0.5) * 1.4) * (0.5 + 0.5 * Math.sin(t * 1.3 + m * 2)) * 0.5;
+    if (a > 0.04) for (let n = 0; n < 3; n++) d[j * 4 + n] = lerp(d[j * 4 + n], [255, 236, 200][n], a);
+  }
+  for (let j = 0, i = 0; j < W * H; j++, i += 4) { d[i] *= VIG[j]; d[i + 1] *= VIG[j]; d[i + 2] *= VIG[j]; } // a soft vignette
+}
+
 // ---------------------------------------------------------------- each frame
 let fast = false, simTime = Date.now(), last = performance.now(), lampLevel = 0;
 const fmt = (d, tz) => d.toLocaleTimeString("en-GB", { timeZone: tz, hour: "2-digit", minute: "2-digit" });
@@ -951,6 +1094,10 @@ function frame(now) {
     const v = Math.round(lerp(d[j * 4], 235, tw));
     d[j * 4] = d[j * 4 + 1] = v; d[j * 4 + 2] = Math.min(255, v + 10);
   }
+  drawMoon(d, date, suns);
+  sky0 = S[0].col; sky1 = S[1].col;
+  shadow(d, 128, 135.5, 22, 2.2, 0.45);                                       // under the table
+  for (const g of GUESTS) if (g.sit > 0.5) shadow(d, g.seatX + 4 * g.dir, 136, 17, 2.2, 0.4); // under each guest's chair
   // Window light on the sill: the glass pixels above it light the cat with that half's sky.
   for (let x = WIN.x0; x <= WIN.x1; x++) for (let y = WIN.y0; y <= WIN.y1; y++) {
     const j = y * W + x;
@@ -971,7 +1118,16 @@ function frame(now) {
   }
 
   // The cat keeps real time even when the skies run fast, so it stays a cat and not a blur.
-  drawCat(d, catShown(Date.now() / 1000, now / 1000));
+  const cat = catShown(Date.now() / 1000, now / 1000);
+  shadow(d, cat.x, SILL_Y + 0.5, 9, 1.3, 0.35);
+  drawCat(d, cat);
+  if (cat.asleep) for (let n = 0; n < 3; n++) { // little z's drifting up from the bed
+    const p = (now / 2600 + n / 3) % 1, zx = Math.round(cat.x + 3 + p * 6 + Math.sin(p * 6) * 1.5), zy = Math.round(SILL_Y - 9 - p * 16), a = Math.sin(p * Math.PI) * 0.8;
+    for (const [ox, oy] of [[0, 0], [1, 0], [2, 0], [1, 1], [0, 2], [1, 2], [2, 2]]) {
+      const j = ((zy + oy) * W + zx + ox) * 4;
+      for (let k = 0; k < 3; k++) d[j + k] = lerp(d[j + k], [226, 228, 244][k], a);
+    }
+  }
 
   // The guests, in front of everything but the seam.
   guestMask.fill(0);
@@ -988,6 +1144,8 @@ function frame(now) {
     const a = catMask[j] ? 0.3 : kind[j] === GLASS ? 0.55 : 0.3;
     for (let k = 0; k < 3; k++) d[i + k] = lerp(d[i + k], [214, 206, 188][k], a);
   }
+  drawClock(d, date);
+  drawAir(d, now);
   ctx.putImageData(img, 0, 0);
 
   document.getElementById("nA").textContent = PLACES[0].label;
